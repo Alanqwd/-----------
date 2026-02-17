@@ -1,0 +1,95 @@
+
+body {
+     background-image: url(https://img.freepik.com/premium-vector/flat-camouflage-background_23-2151520957.jpg);
+     background-size: 100%;
+    }
+
+
+nav {
+    float: right;
+    margin-top: 40px;
+    padding-right: 1200px;
+}
+
+.nav-links {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+}
+
+.nav-links li {
+    display: inline;
+}
+.nav-links li a {
+    border-radius: 70%;
+    color: #fff;
+    text-decoration: none;
+    padding: 10px 15px;
+    display: inline-block;
+    transition: background-color 0.3s;
+    font-weight: bold;
+    font-family:Georgia, 'Times New Roman', Times, serif;
+}
+.nav-links li a:hover {
+    background-color: #ff0800;
+}
+.HelloText1{
+font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+padding-left: 200px;
+color: #ff8800;
+font-size: smaller;
+}
+.HelloText2{
+font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+padding-left: 350px;
+color: #ff8800;
+font-size: smaller;
+}
+.HelloText3{
+font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+color: #ff8800;
+padding-left: 500px;
+font-size: smaller;
+}
+.site-footer {
+            background-color: #ff8800; 
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            color: #fff;
+            text-decoration: none;
+            font-weight: bold;
+        }
+  input[type="text"] {
+    width: 300px;
+    padding: 8px;
+    margin-bottom: 10px;
+  }
+  .posts {
+    list-style: none;
+    padding: 0;
+  }
+  .post {
+    border: 1px solid #ccc;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+  .highlight {
+    background-color: yellow;
+  }
+  .no-results {
+    font-weight: bold;
+    color: red;
+  }
+  .sort-buttons {
+    margin-top: 10px;
+  }
+  button {
+    margin-right: 10px;
+  }
+
+
+
+
+
+

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<title>Поиск постов</title>
+  <script src="js/mock.js" defer></script>
+</head>
+
+<body>
+
+<h1>Поиск постов</h1>
+
+<input type="text" id="searchInput" placeholder="Поиск по названию, содержимому и тегам..." />
+
+<div class="sort-buttons">
+  <button id="sortDate">Сортировать по дате</button>
+  <button id="sortViews">Сортировать по просмотрам</button>
+</div>
+
+<ul id="postsContainer" class="posts"></ul>
+<div id="noResults" class="no-results" style="display: none;">По вашему запросу ничего не найдено</div>
+
+</body>
+</html>
