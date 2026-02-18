@@ -1,23 +1,21 @@
-// function highlightActiveLink() {
-//     const links = document.getElementById('nav').getElementsByTagName('a');
-//     const currentUrl = window.location.href;
-//     console.log(`Текущий url: ${currentUrl}`); 
+function highlightActiveLink() {
+  const currentUrl = window.location.href;
+  console.log(`Текущий url: ${currentUrl}`);
 
 
+  const path = window.location.pathname;
+  const page = path.substring(path.lastIndexOf('/') + 1);
 
-//     for (let i = 0; i < links.length; i++) {
-//         if (currentUrl.indexOf(links[i].href) >= 0) {
-//           console.log(links[i].href);
-//             links[i].classList.add('active');
-//         } else {
-//             links[i].classList.remove('active');
-//         }
-//     }
+ 
+  const navLinks = document.querySelectorAll('nav a');
 
+  navLinks.forEach(link => {
+    link.classList.remove('active');
+    const href = link.getAttribute('href');
+    if (href === page) {
+      link.classList.add('active');
+    }
+  });
+}
 
-// window.onload = function() {
-//     highlightActiveLink();
-   
-// }};
-
-
+document.addEventListener('DOMContentLoaded', highlightActiveLink);
