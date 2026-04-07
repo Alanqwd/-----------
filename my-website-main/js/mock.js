@@ -1,18 +1,19 @@
+// js/mock.js
+import { escapeHtml, truncate, highlightKeywords, formatCodeBlock, createSanitizer, setCodeTheme, asyncFormatText } from './text-formatter.js';
+
 function getDates() {
   return [
-    new Date(2026, 2, 22), 
-    new Date(2025, 10, 20),  
-    new Date(2025, 5, 15),  
-    new Date(2026, 10, 5)   
+    new Date(2026, 2, 22),
+    new Date(2025, 10, 20),
+    new Date(2025, 5, 15),
+    new Date(2026, 10, 5)
   ];
 }
-
 
 function formatDate(date) {
   const options = { year: 'numeric', month: 'long', day: 'numeric' };
   return date.toLocaleDateString('ru-RU', options);
 }
-
 
 const dates = getDates();
 
@@ -22,6 +23,7 @@ const posts = [
     title: "Первый пост",
     content: "Это содержание первого поста.",
     tags: ["новости", "обзор"],
+    date: dates[0],
     datePublished: formatDate(dates[0]),
     views: 150
   },
@@ -30,169 +32,229 @@ const posts = [
     title: "Второй пост",
     content: "Содержимое второго поста просто так.",
     tags: ["просто так", "новости"],
+    date: dates[1],
     datePublished: formatDate(dates[1]),
     views: 200
   },
   {
     id: 3,
     title: "Обзор новой одежды",
-    content: "Обзор последней одежды сезона:<p>1) cdg футболка с синими сердечками за 17 тыс.руб. 2) Кеды Crenshaw Skate Club SB Dunk Light Blue за 68 тыс.руб. 3) Кроссовки Dunk High Ambush Deep Royal за 25 тыс.руб. 4) Хлопковые брюки Nike x Off-White за 34 тыс.руб.",
+    content: "Обзор последней одежды сезона:\n```js\nconst price = 17000;\nconsole.log('cdg футболка');\n```\n<p>1) cdg футболка с синими сердечками за 17 тыс.руб. 2) Кеды Crenshaw Skate Club SB Dunk Light Blue за 68 тыс.руб.</p>",
     tags: ["новая одежда", "обзор"],
+    date: dates[2],
     datePublished: formatDate(dates[2]),
     views: 300
   },
   {
     id: 4,
     title: "Новости мира",
-    content: "Свежие новости: Новая коллекция одежды потрясла модный мир этой весной. Сегодня в крупнейших магазинах и онлайн-бутиках появилась новая коллекция одежды, которая быстро стала хитом среди модников. Дизайнеры представили свежие модели, сочетающие стиль и комфорт, что особенно важно для современного образа жизни. Основные тренды новой коллекции — это яркие цвета, минимализм и экологичные материалы. В этом сезоне популярно использование органического хлопка, льна и переработанных тканей, что делает одежду не только красивой, но и экологичной. Среди новинок — легкие платья, свободные брюки и уютные худи, идеально подходящие для повседневной носки. Особое внимание уделено деталям: крупные пуговицы, необычные рукава и яркие принты создают уникальные образы. Модельеры подчеркнули, что комфорт и стиль могут идти рука об руку, и поэтому каждый элемент новой коллекции предназначен для тех, кто ценит качество и индивидуальность. Розничные сети и интернет-магазины уже вовсю принимают заказы. А модные эксперты утверждают, что эта коллекция станет одной из самых популярных этого сезона и вдохновит многих на создание своих стильных образов.",
+    content: "Свежие новости: Новая коллекция одежды потрясла модный мир этой весной. Сегодня в крупнейших магазинах и онлайн-бутиках появилась новая коллекция одежды...",
     tags: ["новости"],
+    date: dates[3],
     datePublished: formatDate(dates[3]),
     views: 120
   }
 ];
 
-function getReadingTime(text) {
-  const wordsPerMinute = 100; 
-  const words = text.trim().split(/\s+/).filter(word => word.length > 0);
-  const minutes = Math.ceil(words.length / wordsPerMinute);
-  return minutes;
-}
-
-function getWordCount(text) {
-  if (!text || typeof text !== 'string') return 0;
-  const words = text.trim().split(/\s+/).filter(word => word.length > 0);
-  return words.length;
-}
-
-function getAverageWordLength(text) {
-  const words = text.trim().split(/\s+/).filter(word => word.length > 0);
-  if (words.length === 0) return 0; 
-  const totalLength = words.reduce((sum, word) => sum + word.length, 0);
-  return totalLength / words.length;
-}
-
-
-function getSentenceCount(text) {
-  if (!text || typeof text !== 'string') return 0;
-
-  const regex = /[.!?](\s|\r?\n|$)/g;
-
-  let count = 0;
-  let match;
-
-  while ((match = regex.exec(text)) !== null) {
-    const index = match.index;
-
-    
-    const prevText = text.slice(0, index).toLowerCase();
-
- 
-    const abbreviations = ['т.д', 'и т.д', 'г.', 'ул.', 'др.', 'ч.', 'г.'];
-
-    let isAbbreviationEnd = false;
-    for (const abbr of abbreviations) {
-      const pattern = new RegExp(`${abbr}\\.$`, 'i');
-      if (pattern.test(prevText)) {
-        isAbbreviationEnd = true;
-        break;
-      }
-    }
-
-    if (!isAbbreviationEnd) {
-      count++;
-    }
-  }
-
-  return count;
-}
-
-let filteredPosts = [...posts];
-
+// DOM элементы
 const searchInput = document.getElementById('searchInput');
 const postsContainer = document.getElementById('postsContainer');
 const noResultsDiv = document.getElementById('noResults');
+const categoriesDiv = document.getElementById('categories');
+const sortDateBtn = document.getElementById('sortDate');
+const sortViewsBtn = document.getElementById('sortViews');
+const formatTextBtn = document.getElementById('formatTextBtn');
+const formatModal = document.getElementById('formatModal');
+const closeModal = document.getElementById('closeModal');
+const exampleBefore = document.getElementById('exampleBefore');
+const exampleAfter = document.getElementById('exampleAfter');
+const themeLight = document.getElementById('themeLight');
+const themeDark = document.getElementById('themeDark');
 
-function escapeRegExp(string) {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+let filteredPosts = [...posts];
+let currentCategory = 'all';
+
+// Текстовые утилиты (локальные)
+function stripHtml(html = '') { return String(html).replace(/<[^>]+>/g, ''); }
+function getWordCount(text = '') { const words = stripHtml(text).trim().match(/\S+/g); return words ? words.length : 0; }
+function getReadingTime(text = '', wpm = 200) { const words = getWordCount(text); return Math.max(1, Math.round(words / wpm)); }
+function getAverageWordLength(text = '') { const words = stripHtml(text).trim().match(/\S+/g) || []; if (!words.length) return 0; return words.reduce((s,w)=>s+w.length,0)/words.length; }
+function getSentenceCount(text = '') { const plain = stripHtml(text).trim(); if (!plain) return 0; const sentences = plain.split(/[.!?]+\s+|\n+/).filter(Boolean); return sentences.length; }
+
+// Замыкание фильтра по категории
+function makeCategoryFilter(category) {
+  return function(post) {
+    if (!category || category === 'all') return true;
+    return post.tags.some(tag => tag.toLowerCase() === category.toLowerCase());
+  };
 }
 
-function highlightMatches(text, query) {
-  if (!query) return text;
-  const regex = new RegExp(`(${escapeRegExp(query)})`, 'gi');
-  return text.replace(regex, '<span class="highlight">$1</span>');
+// renderContentWithCode uses sanitizer
+const sanitizer = createSanitizer();
+function renderContentWithCode(content, keywordHighlighter) {
+  if (content == null) return '';
+  const parts = [];
+  const regex = /```(\w+)?\n([\s\S]*?)```/g;
+  let lastIndex = 0;
+  let m;
+  while ((m = regex.exec(content)) !== null) {
+    const index = m.index;
+    if (index > lastIndex) parts.push({ type: 'text', value: content.slice(lastIndex, index) });
+    parts.push({ type: 'code', lang: m[1] || 'js', value: m[2] });
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < content.length) parts.push({ type: 'text', value: content.slice(lastIndex) });
+
+  const raw = parts.map(part => {
+    if (part.type === 'text') {
+      const plain = stripHtml(part.value);
+      const escaped = escapeHtml(plain);
+      return keywordHighlighter ? keywordHighlighter(escaped) : escaped;
+    } else {
+      return formatCodeBlock(part.value, part.lang);
+    }
+  }).join('');
+
+  return sanitizer(raw);
 }
 
+// Render
 function renderPosts(postsToRender, query) {
+  if (!postsContainer) return;
   postsContainer.innerHTML = '';
 
-  if (postsToRender.length === 0) {
-    noResultsDiv.style.display = 'block';
+  if (!postsToRender || postsToRender.length === 0) {
+    if (noResultsDiv) noResultsDiv.style.display = 'block';
     return;
   } else {
-    noResultsDiv.style.display = 'none';
+    if (noResultsDiv) noResultsDiv.style.display = 'none';
   }
+
+  const q = (query || '').trim();
+  const keywords = q === '' ? [] : q.split(/\s+/).filter(Boolean);
+  const keywordHighlighter = highlightKeywords(keywords, 'highlight');
 
   postsToRender.forEach(post => {
     const li = document.createElement('li');
 
-    const q = query.trim();
+    const highlightedTitle = keywordHighlighter(escapeHtml(post.title));
+    const plainForPreview = stripHtml(post.content);
+    const safePreview = truncate(200)(plainForPreview);
+    const fullContentHtml = post.formattedContent || renderContentWithCode(post.content, keywordHighlighter);
+    const highlightedTags = post.tags.map(tag => keywordHighlighter(escapeHtml(tag))).join(', ');
 
-    const highlightedTitle = highlightMatches(post.title, q);
-    const highlightedContent = highlightMatches(post.content, q);
-    const highlightedTags = post.tags.map(tag => highlightMatches(tag, q)).join(', ');
+    const wordCount = getWordCount(plainForPreview);
+    const readingTimeMinute = getReadingTime(plainForPreview);
+    const averageWordLength = getAverageWordLength(plainForPreview);
+    const sentenceCount = getSentenceCount(plainForPreview);
 
-  
-    const wordCount = getWordCount(post.content);
-    const readingTimeMinute = getReadingTime(post.content);
-    const averageWordLength = getAverageWordLength(post.content);
-    const sentenceCount = getSentenceCount(post.content);
-
-
-li.innerHTML = `
-<h3>${highlightedTitle}</h3>
-<p>${highlightedContent}</p>
-<p><strong>Теги:</strong> ${highlightedTags}</p>
-<p>
-  <em>Дата:</em> ${post.datePublished} | 
-  Просмотры: ${post.views} <p></p>
-  Примерное время чтения: ${readingTimeMinute} мин | 
-  Количество слов: ${wordCount} <p></p>
-  Средняя длина слова: ${averageWordLength.toFixed(2)} символов | 
-  Предложений: ${sentenceCount}
-  
-
-</p>
-`;
- postsContainer.appendChild(li);
+    li.className = 'post';
+    li.innerHTML = `
+      <h3>${highlightedTitle}</h3>
+      <div class="preview">${safePreview}</div>
+      <div class="full-content">${fullContentHtml}</div>
+      <p><strong>Теги:</strong> ${highlightedTags}</p>
+      <p>
+        <em>Дата:</em> ${post.datePublished} |
+        Просмотры: ${post.views}
+      </p>
+      <p>
+        Примерное время чтения: ${readingTimeMinute} мин |
+        Количество слов: ${wordCount} |
+        Средняя длина слова: ${averageWordLength.toFixed(2)} символов |
+        Предложений: ${sentenceCount}
+      </p>
+    `;
+    postsContainer.appendChild(li);
   });
 }
 
+// apply filters
+function applyFilters() {
+  const query = (searchInput && searchInput.value || '').trim().toLowerCase();
+  const categoryFilter = makeCategoryFilter(currentCategory);
 
-searchInput.addEventListener('input', () => {
-  const query = searchInput.value.trim();
   if (query === '') {
-    filteredPosts = [...posts];
+    filteredPosts = posts.filter(categoryFilter);
   } else {
-    const lowerQuery = query.toLowerCase();
     filteredPosts = posts.filter(post => {
-      const inTitle = post.title.toLowerCase().includes(lowerQuery);
-      const inContent = post.content.toLowerCase().includes(lowerQuery);
-      const inTags = post.tags.some(tag => tag.toLowerCase().includes(lowerQuery));
-      return inTitle || inContent || inTags;
+      const inTitle = post.title.toLowerCase().includes(query);
+      const inContent = stripHtml(post.content).toLowerCase().includes(query);
+      const inTags = post.tags.some(tag => tag.toLowerCase().includes(query));
+      return (inTitle || inContent || inTags) && categoryFilter(post);
     });
   }
-  renderPosts(filteredPosts, query);
-});
+  renderPosts(filteredPosts, searchInput ? searchInput.value : '');
+}
 
+// debounce
+function debounce(fn, wait = 250) {
+  let t;
+  return function(...args) {
+    clearTimeout(t);
+    t = setTimeout(() => fn.apply(this, args), wait);
+  };
+}
 
-document.getElementById('sortDate').addEventListener('click', () => {
-  filteredPosts.sort((a, b) => new Date(b.date) - new Date(a.date));
-  renderPosts(filteredPosts, searchInput.value);
-});
+// Events
+if (categoriesDiv) {
+  categoriesDiv.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-cat]');
+    if (!btn) return;
+    currentCategory = btn.getAttribute('data-cat') || 'all';
+    categoriesDiv.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyFilters();
+  });
+}
 
-document.getElementById('sortViews').addEventListener('click', () => {
-  filteredPosts.sort((a, b) => b.views - a.views);
-  renderPosts(filteredPosts, searchInput.value);
-});
+if (searchInput) searchInput.addEventListener('input', debounce(applyFilters, 300));
 
+if (sortDateBtn) {
+  sortDateBtn.addEventListener('click', () => {
+    filteredPosts.sort((a, b) => b.date - a.date);
+    renderPosts(filteredPosts, searchInput ? searchInput.value : '');
+  });
+}
+
+if (sortViewsBtn) {
+  sortViewsBtn.addEventListener('click', () => {
+    filteredPosts.sort((a, b) => b.views - a.views);
+    renderPosts(filteredPosts, searchInput ? searchInput.value : '');
+  });
+}
+
+if (formatTextBtn) {
+  formatTextBtn.addEventListener('click', async () => {
+    formatTextBtn.disabled = true;
+    formatTextBtn.textContent = 'Форматируется...';
+    const sample = posts[0] ? posts[0].content : '';
+    exampleBefore.textContent = sample;
+    try {
+      const formatted = await asyncFormatText(sample);
+      exampleAfter.innerHTML = formatted;
+      // Apply to all posts asynchronously
+      posts.forEach((p) => {
+        asyncFormatText(p.content).then(html => {
+          p.formattedContent = html;
+          renderPosts(filteredPosts, searchInput ? searchInput.value : '');
+        });
+      });
+    } catch (err) {
+      exampleAfter.textContent = 'Ошибка форматирования';
+      console.error(err);
+    } finally {
+      formatTextBtn.disabled = false;
+      formatTextBtn.textContent = 'Форматировать текст';
+      if (formatModal) { formatModal.style.display = 'block'; formatModal.setAttribute('aria-hidden','false'); }
+    }
+  });
+}
+
+closeModal && closeModal.addEventListener('click', () => { if (formatModal) { formatModal.style.display='none'; formatModal.setAttribute('aria-hidden','true'); } });
+
+themeLight && themeLight.addEventListener('click', ()=> setCodeTheme('code-theme-light'));
+themeDark && themeDark.addEventListener('click', ()=> setCodeTheme('code-theme-dark'));
+
+// initial render
 renderPosts(filteredPosts, '');

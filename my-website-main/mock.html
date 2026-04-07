@@ -3,25 +3,23 @@
 <head>
 <meta charset="UTF-8" />
 <title>Search posts</title>
-  <script src="js/mock.js" defer></script>
- <link rel="stylesheet" href="css/style.css"/>
+  <script type="module" src="js/mock.js" defer></script>
+  <link rel="stylesheet" href="css/style.css"/>
 </head>
 
 <body>
 
-
    <div class="logoMain">
-                  <img src="img/LogoS.png" alt="Лого компании">
-                     <nav class="nav-bar">
-                     <ul class="nav-links" id="nav">
-                        <li ><a href="index.html" >Главная</a></li>
-                        <li><a href="about.html" >О нас</a></li>
-                        <li><a href="contact.html" >Контакты</a></li>
-                        <li><a href="mock.html" >Список постов</a></li>
-                    </ul>
-                    </nav>  
-
-            </div>
+     <img src="img/LogoS.png" alt="Лого компании">
+     <nav class="nav-bar">
+       <ul class="nav-links" id="nav">
+         <li><a href="index.html">Главная</a></li>
+         <li><a href="about.html">О нас</a></li>
+         <li><a href="contact.html">Контакты</a></li>
+         <li><a href="mock.html">Список постов</a></li>
+       </ul>
+     </nav>
+   </div>
 
 <h1>Поиск постов</h1>
 
@@ -30,9 +28,39 @@
 <div class="sort-buttons">
   <button id="sortDate">Сортировать по дате</button>
   <button id="sortViews">Сортировать по просмотрам</button>
+  <button id="formatTextBtn">Форматировать текст</button>
+  <button id="themeLight">Тема: светлая</button>
+  <button id="themeDark">Тема: тёмная</button>
+</div>
+
+<div id="categories">
+  <button data-cat="all">Все</button>
+  <button data-cat="новости">Новости</button>
+  <button data-cat="обзор">Обзор</button>
+  <button data-cat="новая одежда">Новая одежда</button>
+  <button data-cat="просто так">Просто так</button>
 </div>
 
 <ul id="postsContainer" class="posts"></ul>
 <div id="noResults" class="no-results" style="display: none;">По вашему запросу ничего не найдено</div>
+
+<!-- Modal -->
+<div id="formatModal" class="modal" aria-hidden="true" style="display:none;">
+  <div class="modal-content">
+    <button id="closeModal" class="close">&times;</button>
+    <h2>Примеры: до → после</h2>
+    <div class="examples">
+      <div>
+        <h3>До</h3>
+        <pre id="exampleBefore" class="example before"></pre>
+      </div>
+      <div>
+        <h3>После</h3>
+        <pre id="exampleAfter" class="example after"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

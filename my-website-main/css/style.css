@@ -1,98 +1,135 @@
-
+/* Базовые */
 body {
-     background-image: url(https://img.freepik.com/premium-vector/flat-camouflage-background_23-2151520957.jpg);
-     background-size: 100%;
-    }
-
-
-nav {
-    float: right;
-    margin-top: 40px;
-    padding-right: 1200px;
+  background-image: url(https://img.freepik.com/premium-vector/flat-camouflage-background_23-2151520957.jpg);
+  background-size: cover;
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  color: #111;
 }
 
-.nav-links {
-    list-style-type: none;
-    margin: 0;
-    padding: 0;
+/* Хедер / навигация */
+.logoMain {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 16px;
 }
-
-.nav-links li {
-    display: inline;
-}
+.logoMain img { height: 48px; width: auto; }
+.nav-bar { margin-left: auto; }
+.nav-links { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; align-items: center; }
 .nav-links li a {
-    border-radius: 70%;
-    color: #fff;
-    text-decoration: none;
-    padding: 10px 15px;
-    display: inline-block;
-    transition: background-color 0.3s;
-    font-weight: bold;
-    font-family:Georgia, 'Times New Roman', Times, serif;
+  border-radius: 8px;
+  color: #fff;
+  text-decoration: none;
+  padding: 8px 12px;
+  display: inline-block;
+  transition: background-color 0.2s;
+  font-weight: 700;
+  font-family: Georgia, "Times New Roman", Times, serif;
+  background: rgba(0,0,0,0.35);
 }
-.nav-links li a:hover {
-    background-color: #ff0800;
+.nav-links li a:hover { background-color: #ff0800; }
+
+/* Основной контент */
+main { padding: 16px; max-width: 900px; margin: 0 auto; background: rgba(255,255,255,0.92); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,0.12); }
+h1 { margin-top: 0; color: #111827; }
+
+.visually-hidden { position: absolute !important; height: 1px; width: 1px; overflow: hidden; clip: rect(1px,1px,1px,1px); white-space: nowrap; }
+
+/* Поиск, категории и кнопки */
+input[type="search"] {
+  width: 100%;
+  max-width: 480px;
+  padding: 10px;
+  margin: 8px 0 12px 0;
+  border: 1px solid #ddd;
+  border-radius: 6px;
 }
-.HelloText1{
-font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
-padding-left: 200px;
-color: #ff8800;
-font-size: smaller;
+.controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 12px; }
+.sort-buttons, #categories { display: flex; gap: 8px; align-items: center; }
+#categories button.active { background: #111827; color: #fff; border-radius: 4px; padding: 6px 10px; }
+
+/* Стили для списка постов */
+.posts { list-style: none; padding: 0; margin: 0; }
+.posts li { border-bottom: 1px solid #eee; padding: 12px 0; }
+.preview { color: #444; margin-bottom: 8px; }
+.full-content { margin: 8px 0; }
+.posts p { color: #666; font-size: 0.95rem; margin: 4px 0; }
+
+/* Теги и метаданные */
+.posts p strong { margin-right: 6px; }
+
+/* Кнопки */
+.sort-buttons button, #categories button {
+  border: 1px solid #ddd;
+  background: #fff;
+  padding: 6px 10px;
+  cursor: pointer;
+  border-radius: 4px;
 }
-.HelloText2{
-font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
-padding-left: 350px;
-color: #ff8800;
-font-size: smaller;
+.sort-buttons button:hover, #categories button:hover { background: #f3f4f6; }
+
+/* Подсветка ключевых слов */
+.highlight {
+  background-color: #fff59d;
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 2px;
+  box-decoration-break: clone;
 }
-.HelloText3{
-font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
-color: #ff8800;
-padding-left: 500px;
-font-size: smaller;
+
+/* Код */
+pre {
+  background: #0f1720;
+  color: #e6eef6;
+  padding: 12px;
+  border-radius: 6px;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
+code[class^="language-"], code[class*=" language-"] { font-family: inherit; font-size: inherit; color: inherit; }
+.cm-comment { color: #6b7280; font-style: italic; }
+.cm-string  { color: #fca5a5; }
+.cm-number  { color: #f59e0b; }
+.cm-keyword { color: #60a5fa; font-weight: 600; }
+
+
+.code-theme-light .cm-keyword{ color:#1a1a8a; }
+.code-theme-light .cm-string{ color:#0b6; }
+.code-theme-light .cm-comment{ color:#999; }
+.code-theme-light .cm-number{ color:#d14; }
+
+.code-theme-dark { background:#0f1720; color:#cbd5e1; }
+.code-theme-dark .post { background:transparent; color:inherit; }
+.code-theme-dark .cm-keyword{ color:#ffb86b; }
+.code-theme-dark .cm-string{ color:#9effff; }
+.code-theme-dark .cm-comment{ color:#7c7c7c; }
+.code-theme-dark .cm-number{ color:#ffd580; }
+/* no-results и футер */
+.no-results { font-weight: 700; color: #c00; margin-top: 8px; }
 .site-footer {
-            background-color: #ff8800; 
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-            color: #fff;
-            text-decoration: none;
-            font-weight: bold;
-        }
-  input[type="text"] {
-    width: 300px;
-    padding: 8px;
-    margin-bottom: 10px;
-  }
-  .posts {
-    list-style: none;
-    padding: 0;
-  }
-  .post {
-    border: 1px solid #ccc;
-    padding: 10px;
-    margin-bottom: 10px;
-  }
-  .highlight {
-    background-color: yellow;
-  }
-  .no-results {
-    font-weight: bold;
-    color: red;
-  }
-  .sort-buttons {
-    margin-top: 10px;
-  }
-  button {
-    margin-right: 10px;
-  }
-.highlight{
-  background-color: #ff0800;
+  background-color: #ff8800;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  color: #fff;
+  font-weight: bold;
+  text-align: center;
+  padding: 8px 0;
 }
 
 
 
-
-
-
+/* Адаптивность */
+@media (max-width: 600px) {
+  pre { font-size: 0.85rem; }
+  .posts p { font-size: 0.9rem; }
+  .logoMain { padding: 8px; gap: 12px; }
+  main { padding: 12px; margin: 12px; }
+}
+.modal-content { position:relative; background:#fff; padding:20px; width:90%; max-width:900px; border-radius:6px; }
+.close { position:absolute; right:16px; top:12px; font-size:24px; border:none; background:transparent; cursor:pointer; }
+.examples { display:flex; gap:16px; }
+.example { background:#f7f7f7; padding:12px; max-height:60vh; overflow:auto; white-space:pre-wrap; }
