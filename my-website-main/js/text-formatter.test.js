@@ -11,7 +11,7 @@ import {
 } from '../js/text-formatter.js';
 
 describe('escapeHtml', () => {
-  test('экранирует спецсимволы', () => {
+  test('экранирует спец-символы', () => {
     expect(escapeHtml('<div>&"\'</div>')).toBe('&lt;div&gt;&amp;&quot;&#39;&lt;/div&gt;');
   });
   test('возвращает пустую строку для null/undefined', () => {

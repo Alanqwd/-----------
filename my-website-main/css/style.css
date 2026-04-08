@@ -1,4 +1,4 @@
-/* Базовые */
+
 body {
   background-image: url(https://img.freepik.com/premium-vector/flat-camouflage-background_23-2151520957.jpg);
   background-size: cover;
@@ -7,7 +7,7 @@ body {
   color: #111;
 }
 
-/* Хедер / навигация */
+
 .logoMain {
   display: flex;
   align-items: center;
@@ -30,13 +30,12 @@ body {
 }
 .nav-links li a:hover { background-color: #ff0800; }
 
-/* Основной контент */
+
 main { padding: 16px; max-width: 900px; margin: 0 auto; background: rgba(255,255,255,0.92); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,0.12); }
 h1 { margin-top: 0; color: #111827; }
 
 .visually-hidden { position: absolute !important; height: 1px; width: 1px; overflow: hidden; clip: rect(1px,1px,1px,1px); white-space: nowrap; }
 
-/* Поиск, категории и кнопки */
 input[type="search"] {
   width: 100%;
   max-width: 480px;
@@ -49,17 +48,16 @@ input[type="search"] {
 .sort-buttons, #categories { display: flex; gap: 8px; align-items: center; }
 #categories button.active { background: #111827; color: #fff; border-radius: 4px; padding: 6px 10px; }
 
-/* Стили для списка постов */
+
 .posts { list-style: none; padding: 0; margin: 0; }
 .posts li { border-bottom: 1px solid #eee; padding: 12px 0; }
 .preview { color: #444; margin-bottom: 8px; }
 .full-content { margin: 8px 0; }
 .posts p { color: #666; font-size: 0.95rem; margin: 4px 0; }
 
-/* Теги и метаданные */
+
 .posts p strong { margin-right: 6px; }
 
-/* Кнопки */
 .sort-buttons button, #categories button {
   border: 1px solid #ddd;
   background: #fff;
@@ -69,7 +67,7 @@ input[type="search"] {
 }
 .sort-buttons button:hover, #categories button:hover { background: #f3f4f6; }
 
-/* Подсветка ключевых слов */
+
 .highlight {
   background-color: #fff59d;
   color: inherit;
@@ -78,7 +76,7 @@ input[type="search"] {
   box-decoration-break: clone;
 }
 
-/* Код */
+
 pre {
   background: #0f1720;
   color: #e6eef6;
@@ -107,7 +105,7 @@ code[class^="language-"], code[class*=" language-"] { font-family: inherit; font
 .code-theme-dark .cm-string{ color:#9effff; }
 .code-theme-dark .cm-comment{ color:#7c7c7c; }
 .code-theme-dark .cm-number{ color:#ffd580; }
-/* no-results и футер */
+
 .no-results { font-weight: 700; color: #c00; margin-top: 8px; }
 .site-footer {
   background-color: #ff8800;
@@ -122,7 +120,7 @@ code[class^="language-"], code[class*=" language-"] { font-family: inherit; font
 
 
 
-/* Адаптивность */
+
 @media (max-width: 600px) {
   pre { font-size: 0.85rem; }
   .posts p { font-size: 0.9rem; }

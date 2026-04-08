@@ -1,4 +1,4 @@
-// js/mock.js
+
 import { escapeHtml, truncate, highlightKeywords, formatCodeBlock, createSanitizer, setCodeTheme, asyncFormatText } from './text-formatter.js';
 
 function getDates() {
@@ -56,7 +56,7 @@ const posts = [
   }
 ];
 
-// DOM элементы
+
 const searchInput = document.getElementById('searchInput');
 const postsContainer = document.getElementById('postsContainer');
 const noResultsDiv = document.getElementById('noResults');
@@ -74,14 +74,14 @@ const themeDark = document.getElementById('themeDark');
 let filteredPosts = [...posts];
 let currentCategory = 'all';
 
-// Текстовые утилиты (локальные)
+
 function stripHtml(html = '') { return String(html).replace(/<[^>]+>/g, ''); }
 function getWordCount(text = '') { const words = stripHtml(text).trim().match(/\S+/g); return words ? words.length : 0; }
 function getReadingTime(text = '', wpm = 200) { const words = getWordCount(text); return Math.max(1, Math.round(words / wpm)); }
 function getAverageWordLength(text = '') { const words = stripHtml(text).trim().match(/\S+/g) || []; if (!words.length) return 0; return words.reduce((s,w)=>s+w.length,0)/words.length; }
 function getSentenceCount(text = '') { const plain = stripHtml(text).trim(); if (!plain) return 0; const sentences = plain.split(/[.!?]+\s+|\n+/).filter(Boolean); return sentences.length; }
 
-// Замыкание фильтра по категории
+
 function makeCategoryFilter(category) {
   return function(post) {
     if (!category || category === 'all') return true;
@@ -89,7 +89,7 @@ function makeCategoryFilter(category) {
   };
 }
 
-// renderContentWithCode uses sanitizer
+
 const sanitizer = createSanitizer();
 function renderContentWithCode(content, keywordHighlighter) {
   if (content == null) return '';
@@ -118,7 +118,7 @@ function renderContentWithCode(content, keywordHighlighter) {
   return sanitizer(raw);
 }
 
-// Render
+
 function renderPosts(postsToRender, query) {
   if (!postsContainer) return;
   postsContainer.innerHTML = '';
@@ -169,7 +169,7 @@ function renderPosts(postsToRender, query) {
   });
 }
 
-// apply filters
+
 function applyFilters() {
   const query = (searchInput && searchInput.value || '').trim().toLowerCase();
   const categoryFilter = makeCategoryFilter(currentCategory);
@@ -187,7 +187,7 @@ function applyFilters() {
   renderPosts(filteredPosts, searchInput ? searchInput.value : '');
 }
 
-// debounce
+
 function debounce(fn, wait = 250) {
   let t;
   return function(...args) {
@@ -196,7 +196,7 @@ function debounce(fn, wait = 250) {
   };
 }
 
-// Events
+
 if (categoriesDiv) {
   categoriesDiv.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-cat]');
@@ -233,7 +233,7 @@ if (formatTextBtn) {
     try {
       const formatted = await asyncFormatText(sample);
       exampleAfter.innerHTML = formatted;
-      // Apply to all posts asynchronously
+   
       posts.forEach((p) => {
         asyncFormatText(p.content).then(html => {
           p.formattedContent = html;
@@ -256,5 +256,5 @@ closeModal && closeModal.addEventListener('click', () => { if (formatModal) { fo
 themeLight && themeLight.addEventListener('click', ()=> setCodeTheme('code-theme-light'));
 themeDark && themeDark.addEventListener('click', ()=> setCodeTheme('code-theme-dark'));
 
-// initial render
+
 renderPosts(filteredPosts, '');

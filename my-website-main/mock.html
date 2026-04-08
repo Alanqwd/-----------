@@ -4,7 +4,10 @@
 <meta charset="UTF-8" />
 <title>Search posts</title>
   <script type="module" src="js/mock.js" defer></script>
+  <script type="module" src="js/main.js" defer></script>
+  
   <link rel="stylesheet" href="css/style.css"/>
+  
 </head>
 
 <body>
@@ -44,7 +47,7 @@
 <ul id="postsContainer" class="posts"></ul>
 <div id="noResults" class="no-results" style="display: none;">По вашему запросу ничего не найдено</div>
 
-<!-- Modal -->
+
 <div id="formatModal" class="modal" aria-hidden="true" style="display:none;">
   <div class="modal-content">
     <button id="closeModal" class="close">&times;</button>
@@ -61,6 +64,9 @@
     </div>
   </div>
 </div>
+
+ <button id="demo-btn">Демо наследования</button>
+    <div id="output"></div>
 
 </body>
 </html>
