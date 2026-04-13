@@ -1,6 +1,26 @@
 
 import { escapeHtml, truncate, highlightKeywords, formatCodeBlock, createSanitizer, setCodeTheme, asyncFormatText } from './text-formatter.js';
 
+export class PostList {
+    constructor(containerId, stateManager, a11yManager) {
+        this.container = document.getElementById(containerId);
+        this.state = stateManager;
+        this.a11y = a11yManager;
+        this.selectedIndex = -1; 
+        
+        // Делегирование кликов
+        this.container.addEventListener('click', (e) => this.handleClick(e));
+        
+        // Глобальная обработка клавиш для навигации по списку
+        // (вызывается из main.js или здесь, если проверять условия)
+        document.addEventListener('keydown', (e) => this.handleKeydown(e));
+    }
+
+
+
+
+
+
 function getDates() {
   return [
     new Date(2026, 2, 22),
@@ -55,32 +75,11 @@ const posts = [
     views: 120
   }
 ];
-
-
-const searchInput = document.getElementById('searchInput');
-const postsContainer = document.getElementById('postsContainer');
-const noResultsDiv = document.getElementById('noResults');
-const categoriesDiv = document.getElementById('categories');
-const sortDateBtn = document.getElementById('sortDate');
-const sortViewsBtn = document.getElementById('sortViews');
-const formatTextBtn = document.getElementById('formatTextBtn');
-const formatModal = document.getElementById('formatModal');
-const closeModal = document.getElementById('closeModal');
-const exampleBefore = document.getElementById('exampleBefore');
-const exampleAfter = document.getElementById('exampleAfter');
-const themeLight = document.getElementById('themeLight');
-const themeDark = document.getElementById('themeDark');
-
-let filteredPosts = [...posts];
-let currentCategory = 'all';
-
-
 function stripHtml(html = '') { return String(html).replace(/<[^>]+>/g, ''); }
 function getWordCount(text = '') { const words = stripHtml(text).trim().match(/\S+/g); return words ? words.length : 0; }
 function getReadingTime(text = '', wpm = 200) { const words = getWordCount(text); return Math.max(1, Math.round(words / wpm)); }
 function getAverageWordLength(text = '') { const words = stripHtml(text).trim().match(/\S+/g) || []; if (!words.length) return 0; return words.reduce((s,w)=>s+w.length,0)/words.length; }
 function getSentenceCount(text = '') { const plain = stripHtml(text).trim(); if (!plain) return 0; const sentences = plain.split(/[.!?]+\s+|\n+/).filter(Boolean); return sentences.length; }
-
 
 function makeCategoryFilter(category) {
   return function(post) {
@@ -89,8 +88,8 @@ function makeCategoryFilter(category) {
   };
 }
 
-
 const sanitizer = createSanitizer();
+
 function renderContentWithCode(content, keywordHighlighter) {
   if (content == null) return '';
   const parts = [];
@@ -118,11 +117,69 @@ function renderContentWithCode(content, keywordHighlighter) {
   return sanitizer(raw);
 }
 
+const searchInput = document.getElementById('searchInput');
+const postsContainer = document.getElementById('postsContainer');
+const noResultsDiv = document.getElementById('noResults');
+const categoriesDiv = document.getElementById('categories');
+const sortDateBtn = document.getElementById('sortDate');
+const sortViewsBtn = document.getElementById('sortViews');
+const themeLight = document.getElementById('themeLight');
+const themeDark = document.getElementById('themeDark');
+const formatPanel = document.getElementById('formatPanel');
+const panelBefore = document.getElementById('panelBefore');
+const panelAfter = document.getElementById('panelAfter');
+const panelEdit = document.getElementById('panelEdit');
+const panelSave = document.getElementById('panelSave');
+const panelClose = document.getElementById('panelClose');
 
+let filteredPosts = [...posts]; // posts из mock.js
+let currentCategory = 'all';
+let activePostId = null;
+
+function openFormatPanelForPost(post) {
+  activePostId = post.id;
+  const plain = stripHtml(post.content);
+  panelBefore.textContent = plain;
+  panelEdit.value = plain;
+  panelAfter.textContent = plain; // сразу одинаково, изменится при edit
+  formatPanel.style.display = 'block';
+  formatPanel.setAttribute('aria-hidden','false');
+  // фокус в поле редактирования
+  panelEdit.focus();
+}
+
+function closeFormatPanel() {
+  activePostId = null;
+  formatPanel.style.display = 'none';
+  formatPanel.setAttribute('aria-hidden','true');
+}
+
+panelClose.addEventListener('click', () => {
+  closeFormatPanel();
+});
+
+panelEdit.addEventListener('input', () => {
+  const edited = panelEdit.value;
+  panelAfter.textContent = edited;
+});
+
+panelSave.addEventListener('click', () => {
+  if (activePostId == null) return;
+  const p = posts.find(x => x.id === activePostId);
+  if (!p) return;
+  // сохраняем в content (можем хранить как plain text или с markdown/code — сохраняем как plain)
+  p.content = panelEdit.value;
+  // сбросить formattedContent, чтобы при повторном форматировании пересоздать
+  delete p.formattedContent;
+  // повторный рендер текущего набора фильтрованных постов
+  renderPosts(filteredPosts, searchInput ? searchInput.value : '');
+  closeFormatPanel();
+});
+
+// --- rendering posts with per-post format button ---
 function renderPosts(postsToRender, query) {
   if (!postsContainer) return;
   postsContainer.innerHTML = '';
-
   if (!postsToRender || postsToRender.length === 0) {
     if (noResultsDiv) noResultsDiv.style.display = 'block';
     return;
@@ -150,7 +207,12 @@ function renderPosts(postsToRender, query) {
 
     li.className = 'post';
     li.innerHTML = `
-      <h3>${highlightedTitle}</h3>
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <h3 style="margin:0;">${highlightedTitle}</h3>
+        <div>
+          <button class="format-post-btn" data-id="${post.id}">Форматировать текст</button>
+        </div>
+      </div>
       <div class="preview">${safePreview}</div>
       <div class="full-content">${fullContentHtml}</div>
       <p><strong>Теги:</strong> ${highlightedTags}</p>
@@ -167,8 +229,18 @@ function renderPosts(postsToRender, query) {
     `;
     postsContainer.appendChild(li);
   });
-}
 
+
+  // делегировать клики на кнопки форматирования
+  postsContainer.querySelectorAll('.format-post-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = Number(btn.getAttribute('data-id'));
+      const post = posts.find(p => p.id === id);
+      if (!post) return;
+      openFormatPanelForPost(post);
+    });
+  });
+}
 
 function applyFilters() {
   const query = (searchInput && searchInput.value || '').trim().toLowerCase();
@@ -187,7 +259,6 @@ function applyFilters() {
   renderPosts(filteredPosts, searchInput ? searchInput.value : '');
 }
 
-
 function debounce(fn, wait = 250) {
   let t;
   return function(...args) {
@@ -195,7 +266,6 @@ function debounce(fn, wait = 250) {
     t = setTimeout(() => fn.apply(this, args), wait);
   };
 }
-
 
 if (categoriesDiv) {
   categoriesDiv.addEventListener('click', (e) => {
@@ -224,37 +294,8 @@ if (sortViewsBtn) {
   });
 }
 
-if (formatTextBtn) {
-  formatTextBtn.addEventListener('click', async () => {
-    formatTextBtn.disabled = true;
-    formatTextBtn.textContent = 'Форматируется...';
-    const sample = posts[0] ? posts[0].content : '';
-    exampleBefore.textContent = sample;
-    try {
-      const formatted = await asyncFormatText(sample);
-      exampleAfter.innerHTML = formatted;
-   
-      posts.forEach((p) => {
-        asyncFormatText(p.content).then(html => {
-          p.formattedContent = html;
-          renderPosts(filteredPosts, searchInput ? searchInput.value : '');
-        });
-      });
-    } catch (err) {
-      exampleAfter.textContent = 'Ошибка форматирования';
-      console.error(err);
-    } finally {
-      formatTextBtn.disabled = false;
-      formatTextBtn.textContent = 'Форматировать текст';
-      if (formatModal) { formatModal.style.display = 'block'; formatModal.setAttribute('aria-hidden','false'); }
-    }
-  });
-}
-
-closeModal && closeModal.addEventListener('click', () => { if (formatModal) { formatModal.style.display='none'; formatModal.setAttribute('aria-hidden','true'); } });
-
 themeLight && themeLight.addEventListener('click', ()=> setCodeTheme('code-theme-light'));
 themeDark && themeDark.addEventListener('click', ()=> setCodeTheme('code-theme-dark'));
 
-
+// initial render
 renderPosts(filteredPosts, '');
