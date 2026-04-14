@@ -1,26 +1,6 @@
 
 import { escapeHtml, truncate, highlightKeywords, formatCodeBlock, createSanitizer, setCodeTheme, asyncFormatText } from './text-formatter.js';
 
-export class PostList {
-    constructor(containerId, stateManager, a11yManager) {
-        this.container = document.getElementById(containerId);
-        this.state = stateManager;
-        this.a11y = a11yManager;
-        this.selectedIndex = -1; 
-        
-        // Делегирование кликов
-        this.container.addEventListener('click', (e) => this.handleClick(e));
-        
-        // Глобальная обработка клавиш для навигации по списку
-        // (вызывается из main.js или здесь, если проверять условия)
-        document.addEventListener('keydown', (e) => this.handleKeydown(e));
-    }
-
-
-
-
-
-
 function getDates() {
   return [
     new Date(2026, 2, 22),
@@ -75,6 +55,7 @@ const posts = [
     views: 120
   }
 ];
+
 function stripHtml(html = '') { return String(html).replace(/<[^>]+>/g, ''); }
 function getWordCount(text = '') { const words = stripHtml(text).trim().match(/\S+/g); return words ? words.length : 0; }
 function getReadingTime(text = '', wpm = 200) { const words = getWordCount(text); return Math.max(1, Math.round(words / wpm)); }
@@ -117,6 +98,7 @@ function renderContentWithCode(content, keywordHighlighter) {
   return sanitizer(raw);
 }
 
+
 const searchInput = document.getElementById('searchInput');
 const postsContainer = document.getElementById('postsContainer');
 const noResultsDiv = document.getElementById('noResults');
@@ -132,19 +114,28 @@ const panelEdit = document.getElementById('panelEdit');
 const panelSave = document.getElementById('panelSave');
 const panelClose = document.getElementById('panelClose');
 
-let filteredPosts = [...posts]; // posts из mock.js
+
+const addPostForm = document.getElementById('addPostForm');
+const postTitle = document.getElementById('postTitle');
+const postTags = document.getElementById('postTags');
+const postContent = document.getElementById('postContent');
+const cancelAddPost = document.getElementById('cancelAddPost');
+
+let filteredPosts = [...posts];
 let currentCategory = 'all';
 let activePostId = null;
+
+
+posts.forEach(p => { p.likes = p.likes || 0; p.deleted = false; });
 
 function openFormatPanelForPost(post) {
   activePostId = post.id;
   const plain = stripHtml(post.content);
   panelBefore.textContent = plain;
   panelEdit.value = plain;
-  panelAfter.textContent = plain; // сразу одинаково, изменится при edit
+  panelAfter.textContent = plain;
   formatPanel.style.display = 'block';
   formatPanel.setAttribute('aria-hidden','false');
-  // фокус в поле редактирования
   panelEdit.focus();
 }
 
@@ -154,29 +145,42 @@ function closeFormatPanel() {
   formatPanel.setAttribute('aria-hidden','true');
 }
 
-panelClose.addEventListener('click', () => {
-  closeFormatPanel();
-});
 
-panelEdit.addEventListener('input', () => {
+panelClose && panelClose.addEventListener('click', () => closeFormatPanel());
+
+panelEdit && panelEdit.addEventListener('input', () => {
   const edited = panelEdit.value;
   panelAfter.textContent = edited;
 });
 
-panelSave.addEventListener('click', () => {
+panelSave && panelSave.addEventListener('click', () => {
   if (activePostId == null) return;
   const p = posts.find(x => x.id === activePostId);
   if (!p) return;
-  // сохраняем в content (можем хранить как plain text или с markdown/code — сохраняем как plain)
   p.content = panelEdit.value;
-  // сбросить formattedContent, чтобы при повторном форматировании пересоздать
   delete p.formattedContent;
-  // повторный рендер текущего набора фильтрованных постов
   renderPosts(filteredPosts, searchInput ? searchInput.value : '');
   closeFormatPanel();
 });
 
-// --- rendering posts with per-post format button ---
+
+function openAddPostForm(focusField = postTitle) {
+  if (!addPostForm) return;
+  addPostForm.style.display = '';
+  addPostForm.setAttribute('aria-hidden','false');
+  focusField && focusField.focus();
+  document.body.classList.add('modal-open');
+}
+function closeAddPostForm() {
+  if (!addPostForm) return;
+  addPostForm.style.display = 'none';
+  addPostForm.setAttribute('aria-hidden','true');
+  document.body.classList.remove('modal-open');
+  addPostForm.reset();
+}
+cancelAddPost && cancelAddPost.addEventListener('click', closeAddPostForm);
+
+
 function renderPosts(postsToRender, query) {
   if (!postsContainer) return;
   postsContainer.innerHTML = '';
@@ -192,7 +196,13 @@ function renderPosts(postsToRender, query) {
   const keywordHighlighter = highlightKeywords(keywords, 'highlight');
 
   postsToRender.forEach(post => {
+    if (post.deleted) return;
     const li = document.createElement('li');
+    li.className = 'post';
+    li.setAttribute('data-id', String(post.id));
+    li.setAttribute('tabindex', '0');
+    li.setAttribute('role', 'article');
+    li.setAttribute('aria-labelledby', `post-title-${post.id}`);
 
     const highlightedTitle = keywordHighlighter(escapeHtml(post.title));
     const plainForPreview = stripHtml(post.content);
@@ -205,12 +215,12 @@ function renderPosts(postsToRender, query) {
     const averageWordLength = getAverageWordLength(plainForPreview);
     const sentenceCount = getSentenceCount(plainForPreview);
 
-    li.className = 'post';
     li.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-        <h3 style="margin:0;">${highlightedTitle}</h3>
+        <h3 id="post-title-${post.id}" style="margin:0;">${highlightedTitle}</h3>
         <div>
           <button class="format-post-btn" data-id="${post.id}">Форматировать текст</button>
+          <button class="like-btn" data-id="${post.id}" aria-pressed="${post.likes>0 ? 'true' : 'false'}" title="Лайк (Space/Enter)">❤ <span class="like-count">${post.likes}</span></button>
         </div>
       </div>
       <div class="preview">${safePreview}</div>
@@ -229,18 +239,8 @@ function renderPosts(postsToRender, query) {
     `;
     postsContainer.appendChild(li);
   });
-
-
-  // делегировать клики на кнопки форматирования
-  postsContainer.querySelectorAll('.format-post-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const id = Number(btn.getAttribute('data-id'));
-      const post = posts.find(p => p.id === id);
-      if (!post) return;
-      openFormatPanelForPost(post);
-    });
-  });
 }
+
 
 function applyFilters() {
   const query = (searchInput && searchInput.value || '').trim().toLowerCase();
@@ -297,5 +297,244 @@ if (sortViewsBtn) {
 themeLight && themeLight.addEventListener('click', ()=> setCodeTheme('code-theme-light'));
 themeDark && themeDark.addEventListener('click', ()=> setCodeTheme('code-theme-dark'));
 
-// initial render
+
+addPostForm && addPostForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const title = (postTitle && postTitle.value || '').trim();
+  const tags = (postTags && postTags.value || '').split(',').map(s => s.trim()).filter(Boolean);
+  const content = postContent ? postContent.value : '';
+  if (!title) {
+    postTitle && postTitle.focus();
+    return;
+  }
+  const newPost = {
+    id: Date.now(),
+    title,
+    content,
+    tags,
+    date: new Date(),
+    datePublished: formatDate(new Date()),
+    views: 0,
+    likes: 0
+  };
+  posts.unshift(newPost);
+  applyFilters();
+  closeAddPostForm();
+});
+
+
+postsContainer && postsContainer.addEventListener('click', (ev) => {
+  const likeBtn = ev.target.closest('.like-btn');
+  if (likeBtn) {
+    const id = Number(likeBtn.getAttribute('data-id'));
+    const p = posts.find(x => x.id === id);
+    if (!p) return;
+    p.likes = (p.likes || 0) + 1;
+    likeBtn.setAttribute('aria-pressed','true');
+    const countEl = likeBtn.querySelector('.like-count');
+    if (countEl) countEl.textContent = p.likes;
+    return;
+  }
+  const formatBtn = ev.target.closest('.format-post-btn');
+  if (formatBtn) {
+    const id = Number(formatBtn.getAttribute('data-id'));
+    const post = posts.find(p => p.id === id);
+    if (!post) return;
+    openFormatPanelForPost(post);
+    return;
+  }
+});
+
+
+document.addEventListener('keydown', (e) => {
+  const ctrl = e.ctrlKey || e.metaKey;
+
+  if (ctrl && e.key === '/') {
+    e.preventDefault();
+    searchInput && searchInput.focus();
+    return;
+  }
+  
+
+  if (ctrl && (e.key === 'n' || e.key === 'N')) {
+    console.log('Esc pressed');
+    e.preventDefault();
+    openAddPostForm();
+    
+    return;
+  }
+
+  if (e.key === 'Escape') {
+    if (formatPanel && formatPanel.style.display !== 'none') {
+      closeFormatPanel();
+      return;
+    }
+    if (addPostForm && addPostForm.style.display !== 'none') {
+      closeAddPostForm();
+      return;
+    }
+  }
+});
+
+
+addPostForm && addPostForm.addEventListener('keydown', (e) => {
+  const isTextArea = e.target === postContent;
+  if (e.key === 'Enter') {
+    if (isTextArea && !(e.ctrlKey || e.metaKey)) {
+      return;
+    }
+    if (!isTextArea) {
+      e.preventDefault();
+      addPostForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    }
+  }
+  if ((e.key === 'Enter' && (e.ctrlKey || e.metaKey)) && isTextArea) {
+    e.preventDefault();
+    addPostForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+  }
+});
+
+
+let focusedPostIndex = -1;
+function focusPostByIndex(idx) {
+  const items = Array.from(postsContainer.querySelectorAll('.post'));
+  if (!items.length) return;
+  if (idx < 0) idx = 0;
+  if (idx >= items.length) idx = items.length -1;
+  focusedPostIndex = idx;
+  items.forEach((it, i) => {
+    it.classList.toggle('focused', i === idx);
+    if (i === idx) {
+      it.focus();
+      it.setAttribute('aria-selected','true');
+    } else {
+      it.removeAttribute('aria-selected');
+    }
+  });
+}
+
+function openEditForFocusedPost() {
+  const items = Array.from(postsContainer.querySelectorAll('.post'));
+  if (!items.length) return;
+
+  
+  const activeEl = document.activeElement;
+  let targetPostEl = null;
+
+  if (activeEl && activeEl.classList.contains('post')) {
+    targetPostEl = activeEl;
+  } else if (activeEl && activeEl.closest('.post')) {
+
+    targetPostEl = activeEl.closest('.post');
+  }
+
+
+  if (!targetPostEl) {
+    if (focusedPostIndex >= 0 && focusedPostIndex < items.length) {
+      targetPostEl = items[focusedPostIndex];
+    } else {
+  
+      if (items.length > 0) {
+        targetPostEl = items[0];
+        focusedPostIndex = 0; 
+      }
+    }
+  }
+
+  if (!targetPostEl) return;
+
+
+  const newIndex = items.indexOf(targetPostEl);
+  if (newIndex !== -1) {
+      focusedPostIndex = newIndex;
+      items.forEach((it, i) => {
+        it.classList.toggle('focused', i === newIndex);
+        if (i === newIndex) {
+            it.focus(); 
+            it.setAttribute('aria-selected','true');
+        } else {
+            it.removeAttribute('aria-selected');
+        }
+      });
+  }
+
+  const id = Number(targetPostEl.getAttribute('data-id'));
+  const post = posts.find(x => x.id === id);
+  if (post) openFormatPanelForPost(post);
+}
+
+postsContainer && postsContainer.addEventListener('keydown', (ev) => {
+  const key = ev.key;
+  const items = Array.from(postsContainer.querySelectorAll('.post'));
+  if (!items.length) return;
+  const currentIndex = items.indexOf(document.activeElement);
+  if (key === 'ArrowDown') {
+    ev.preventDefault();
+    focusPostByIndex(currentIndex < 0 ? 0 : Math.min(items.length-1, currentIndex+1));
+  } else if (key === 'ArrowUp') {
+    ev.preventDefault();
+    focusPostByIndex(currentIndex <= 0 ? 0 : currentIndex-1);
+  } else if (key === ' ' || key === 'Spacebar' || key === 'Enter') {
+    if (currentIndex >=0) {
+      ev.preventDefault();
+      const el = items[currentIndex];
+      const id = Number(el.getAttribute('data-id'));
+      const p = posts.find(x=>x.id===id);
+      if (!p) return;
+      p.likes = (p.likes||0) + 1;
+      const likeBtn = el.querySelector('.like-btn');
+      if (likeBtn) {
+        likeBtn.setAttribute('aria-pressed','true');
+        const c = likeBtn.querySelector('.like-count');
+        if (c) c.textContent = p.likes;
+      }
+    }
+  } else if (key === 'Delete') {
+    if (currentIndex >=0) {
+      ev.preventDefault();
+      const el = items[currentIndex];
+      const id = Number(el.getAttribute('data-id'));
+      const pIndex = posts.findIndex(x=>x.id===id);
+      if (pIndex === -1) return;
+      const confirmed = confirm('Удалить пост?');
+      if (!confirmed) return;
+      posts.splice(pIndex,1);
+      applyFilters();
+      setTimeout(()=> focusPostByIndex(Math.min(currentIndex, postsContainer.querySelectorAll('.post').length-1)), 0);
+    }
+  } else if (key === 'e' || key === 'E') {
+    ev.preventDefault();
+    openEditForFocusedPost();
+  }
+});
+
+
+document.addEventListener('keydown', (e) => {
+
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement && document.activeElement.isContentEditable) return;
+
+  if (e.key === 'e' || e.key === 'E') {
+    e.preventDefault();
+    openEditForFocusedPost();
+  }
+});
+
+
+document.addEventListener('focusin', (e) => {
+  const t = e.target;
+  if (t && t.closest && t.closest('.post')) {
+    const parent = t.closest('.post');
+    if (parent) parent.classList.add('keyboard-focused');
+  }
+});
+document.addEventListener('focusout', (e) => {
+  const t = e.target;
+  if (t && t.closest && t.closest('.post')) {
+    const parent = t.closest('.post');
+    if (parent) parent.classList.remove('keyboard-focused');
+  }
+});
+
+
 renderPosts(filteredPosts, '');

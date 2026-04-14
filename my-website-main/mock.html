@@ -45,15 +45,25 @@
 <div id="noResults" class="no-results" style="display: none;">По вашему запросу ничего не найдено</div>
 
 
+
+<form id="addPostForm" style="display:none;" aria-hidden="true">
+   <input type="text" id="postTitle" placeholder="Заголовок" required>
+   <input type="text" id="postTags" placeholder="Теги через запятую">
+   <textarea id="postContent" placeholder="Содержимое"></textarea>
+   <button type="submit">Добавить</button>
+   <button type="button" id="cancelAddPost">Отмена</button>
+</form>
+
+
 <div id="formatPanel" class="format-panel" style="display:none; position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid #ccc; padding:12px; box-shadow:0 -2px 8px rgba(0,0,0,0.1); z-index:1000;">
   <div style="display:flex; gap:12px; align-items:flex-start;">
     <div style="flex:1;">
       <label><strong>До</strong></label>
-      <pre id="panelBefore" style="white-space:pre-wrap; background:#f7f7f7; padding:8px; height:100px; overflow:auto;"></pre>
+      <pre id="panelBefore" style="white-space:pre-wrap; background:#000000; padding:8px; height:100px; overflow:auto;"></pre>
     </div>
     <div style="flex:1;">
       <label><strong>После</strong></label>
-      <pre id="panelAfter" style="white-space:pre-wrap; background:#f7f7f7; padding:8px; height:100px; overflow:auto;"></pre>
+      <pre id="panelAfter" style="white-space:pre-wrap; background:#000000; padding:8px; height:100px; overflow:auto;"></pre>
     </div>
     <div style="flex:1;">
       <label><strong>Редактировать текст</strong></label>
