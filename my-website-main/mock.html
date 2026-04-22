@@ -9,8 +9,7 @@
 </head>
 
 <body>
-
-   <div class="logoMain">
+ <div class="logoMain">
      <img src="img/LogoS.png" alt="Лого компании">
      <nav class="nav-bar">
        <ul class="nav-links" id="nav">
@@ -24,13 +23,22 @@
 
 <h1>Поиск постов</h1>
 
-<input type="text" id="searchInput" placeholder="Поиск по названию, содержимому и тегам..." />
+<input type="text" id="searchInput" placeholder="Поиск по названию, содержимому и тегам..." style="width: 100%; padding: 8px; margin-bottom: 10px;" />
 
 <div class="sort-buttons">
   <button id="sortDate">Сортировать по дате</button>
   <button id="sortViews">Сортировать по просмотрам</button>
   <button id="themeLight">Тема: светлая</button>
   <button id="themeDark">Тема: тёмная</button>
+</div>
+
+<!-- Панель управления загрузкой -->
+<div class="controls-row">
+    <label style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 8px;">
+        <input type="checkbox" id="manualLoadToggle"> 
+        <span>Использовать кнопку "Загрузить ещё" (иначе авто-загрузка)</span>
+    </label>
+    <span id="postsCountInfo" style="margin-left: auto; font-weight: bold; color: #555;"></span>
 </div>
 
 <div id="categories">
@@ -41,9 +49,17 @@
   <button data-cat="просто так">Просто так</button>
 </div>
 
-<ul id="postsContainer" class="posts"></ul>
-<div id="noResults" class="no-results" style="display: none;">По вашему запросу ничего не найдено</div>
+<!-- Контейнер ВИРТУАЛЬНОГО скролла (единственный список) -->
+<div id="virtual-scroller"></div>
 
+<div id="noResults" class="no-results" style="display: none; padding: 20px; text-align: center;">По вашему запросу ничего не найдено</div>
+
+<!-- Прелоадер и кнопка -->
+<div class="load-more-container">
+    <div id="loader" class="loader"></div>
+    <button id="loadMoreBtn" class="btn-load" style="display:none;">Загрузить еще 5 постов</button>
+    <div id="endMessage" style="display:none; color: gray; margin-top: 10px;">Больше постов нет</div>
+</div>
 
 
 <form id="addPostForm" style="display:none;" aria-hidden="true">
@@ -59,11 +75,11 @@
   <div style="display:flex; gap:12px; align-items:flex-start;">
     <div style="flex:1;">
       <label><strong>До</strong></label>
-      <pre id="panelBefore" style="white-space:pre-wrap; background:#000000; padding:8px; height:100px; overflow:auto;"></pre>
+      <pre id="panelBefore" style="white-space:pre-wrap; background:#000000; color: #0f0; padding:8px; height:100px; overflow:auto;"></pre>
     </div>
     <div style="flex:1;">
       <label><strong>После</strong></label>
-      <pre id="panelAfter" style="white-space:pre-wrap; background:#000000; padding:8px; height:100px; overflow:auto;"></pre>
+      <pre id="panelAfter" style="white-space:pre-wrap; background:#000000; color: #0f0; padding:8px; height:100px; overflow:auto;"></pre>
     </div>
     <div style="flex:1;">
       <label><strong>Редактировать текст</strong></label>
@@ -76,8 +92,21 @@
   </div>
 </div>
 
- <button id="demo-btn">Демо наследования</button>
-    <div id="output"></div>
 
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -131,3 +131,60 @@ code[class^="language-"], code[class*=" language-"] { font-family: inherit; font
 .close { position:absolute; right:16px; top:12px; font-size:24px; border:none; background:transparent; cursor:pointer; }
 .examples { display:flex; gap:16px; }
 .example { background:#f7f7f7; padding:12px; max-height:60vh; overflow:auto; white-space:pre-wrap; }
+
+
+
+
+/* Стили для новых фич */
+    .controls-row { display: flex; align-items: center; gap: 20px; margin-bottom: 15px; background: #f9f9f9; padding: 10px; border-radius: 8px; }
+    
+    /* Виртуальный скроллер - основной контейнер */
+    #virtual-scroller { 
+        position: relative; 
+        overflow-y: auto; 
+        height: 600px; /* Фиксированная высота для работы виртуального скролла */
+        border: 1px solid #ccc; 
+        margin-top: 20px; 
+        background: #fff;
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
+    }
+
+    .loader { 
+        border: 4px solid #f3f3f3; 
+        border-top: 4px solid #3498db; 
+        border-radius: 50%; 
+        width: 30px; 
+        height: 30px; 
+        animation: spin 1s linear infinite; 
+        display: none; 
+        margin: 10px auto; 
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    
+    .load-more-container { text-align: center; margin: 20px 0; min-height: 50px;}
+    .btn-load { padding: 10px 20px; cursor: pointer; background: #333; color: #fff; border: none; border-radius: 4px; font-size: 16px; }
+    .btn-load:hover { background: #555; }
+    .btn-load:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    .post-img { max-width: 100%; height: auto; border-radius: 4px; margin-top: 10px; display: block; object-fit: cover; }
+    
+    /* Элементы виртуального списка */
+    .virtual-item { 
+        position: absolute; 
+        left: 0; 
+        right: 0; 
+        padding: 15px; 
+        box-sizing: border-box; 
+        border-bottom: 1px solid #eee; 
+        background: #fff; 
+        transition: background 0.2s;
+    }
+    .virtual-item:hover { background: #fdfdfd; }
+    .virtual-spacer { pointer-events: none; }
+
+    /* Анимация появления */
+    .fade-in { animation: fadeIn 0.3s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* Подсветка фокуса для клавиатуры */
+    .keyboard-focused { outline: 2px solid #3498db; z-index: 10; }
