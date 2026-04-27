@@ -1,4 +1,6 @@
-import { escapeHtml, truncate, highlightKeywords, formatCodeBlock, createSanitizer, setCodeTheme, asyncFormatText } from './text-formatter.js';
+import { escapeHtml, truncate, highlightKeywords, formatCodeBlock, createSanitizer, setCodeTheme } from './text-formatter.js';
+
+// --- ДАННЫЕ ---
 
 function getDates() {
   const dates = [];
@@ -16,6 +18,7 @@ function formatDate(date) {
 
 const baseDates = getDates();
 
+// Первые 4 поста с добавленными изображениями
 let posts = [
   {
     id: 1,
@@ -25,7 +28,7 @@ let posts = [
     date: baseDates[0],
     datePublished: formatDate(baseDates[0]),
     views: 150,
-    image: "https://via.placeholder.com/600x300/3498db/ffffff?text=Post+1"
+      
   },
   {
     id: 2,
@@ -35,7 +38,7 @@ let posts = [
     date: baseDates[1],
     datePublished: formatDate(baseDates[1]),
     views: 200,
-    image: "https://via.placeholder.com/600x300/e74c3c/ffffff?text=Post+2"
+    image: "https://images.unsplash.com/photo-1493612276216-ee3925520721?w=600&h=300&fit=crop" // Абстракция/Лампочка
   },
   {
     id: 3,
@@ -45,7 +48,7 @@ let posts = [
     date: baseDates[2],
     datePublished: formatDate(baseDates[2]),
     views: 300,
-    image: "https://via.placeholder.com/600x300/2ecc71/ffffff?text=Fashion"
+    image: "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=600&h=300&fit=crop" // Одежда
   },
   {
     id: 4,
@@ -55,11 +58,11 @@ let posts = [
     date: baseDates[3],
     datePublished: formatDate(baseDates[3]),
     views: 120,
-    image: "https://via.placeholder.com/600x300/f1c40f/000000?text=News"
+    image: "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=600&h=300&fit=crop" // Новости/Газеты
   }
 ];
 
-// Генерация 30+ постов
+// Генерация дополнительных постов
 const extraTitles = ["Анализ трендов", "Код ревью", "Прогулка по парку", "Новый JS фреймворк", "Рецепт пиццы", "CSS Grid vs Flexbox", "История одного бага", "Утро программиста", "Выбор монитора", "Тест производительности"];
 const extraContents = [
     "Здесь мы обсуждаем важные аспекты разработки.\n```python\nprint('Hello World')\n```",
@@ -86,7 +89,8 @@ for (let i = 0; i < 30; i++) {
         views: Math.floor(Math.random() * 1000),
         likes: 0,
         deleted: false,
-        image: `https://via.placeholder.com/600x300/${Math.floor(Math.random()*16777215).toString(16)}/ffffff?text=Image+${i+5}`
+        // АВТОМАТИЧЕСКАЯ КАРТИНКА ДЛЯ СГЕНЕРИРОВАННЫХ ПОСТОВ
+        image: `https://picsum.photos/seed/${100 + i}/600/300`
     });
 }
 
@@ -95,12 +99,6 @@ posts.sort((a, b) => b.date - a.date);
 // --- УТИЛИТЫ ---
 
 function stripHtml(html = '') { return String(html).replace(/<[^>]+>/g, ''); }
-function getWordCount(text = '') { const words = stripHtml(text).trim().match(/\S+/g); return words ? words.length : 0; }
-function getReadingTime(text = '', wpm = 200) { const words = getWordCount(text); return Math.max(1, Math.round(words / wpm)); }
-function getAverageWordLength(text = '') { const words = stripHtml(text).trim().match(/\S+/g) || []; if (!words.length) return 0; return words.reduce((s,w)=>s+w.length,0)/words.length; }
-function getSentenceCount(text = '') { const plain = stripHtml(text).trim(); if (!plain) return 0; const sentences = plain.split(/[.!?]+\s+|\n+/).filter(Boolean); return sentences.length; }
-
-// --- HELPERS ---
 
 function makeCategoryFilter(category) {
   return function(post) {
@@ -153,13 +151,11 @@ const panelAfter = document.getElementById('panelAfter');
 const panelEdit = document.getElementById('panelEdit');
 const panelSave = document.getElementById('panelSave');
 const panelClose = document.getElementById('panelClose');
-
 const addPostForm = document.getElementById('addPostForm');
 const postTitle = document.getElementById('postTitle');
 const postTags = document.getElementById('postTags');
 const postContent = document.getElementById('postContent');
 const cancelAddPost = document.getElementById('cancelAddPost');
-
 const loadMoreBtn = document.getElementById('loadMoreBtn');
 const loader = document.getElementById('loader');
 const endMessage = document.getElementById('endMessage');
@@ -170,12 +166,8 @@ const postsCountInfo = document.getElementById('postsCountInfo');
 // --- STATE ---
 
 const ITEMS_PER_PAGE = 5;
-let visibleCount = ITEMS_PER_PAGE;
+let loadedCount = ITEMS_PER_PAGE; 
 let isFetching = false;
-
-// Virtual Scroll Config
-const ITEM_HEIGHT = 280;
-const BUFFER_ITEMS = 5;
 
 let filteredPosts = [...posts];
 let currentCategory = 'all';
@@ -236,17 +228,22 @@ function closeAddPostForm() {
 }
 cancelAddPost && cancelAddPost.addEventListener('click', closeAddPostForm);
 
-// --- VIRTUAL SCROLL RENDER LOGIC ---
+// --- RENDER LOGIC ---
 
 function createPostElement(post, query) {
     if (!post || post.deleted) return null;
     const li = document.createElement('div');
-    li.className = 'virtual-item fade-in';
+    li.className = 'post-item fade-in';
     li.setAttribute('data-id', String(post.id));
     li.setAttribute('tabindex', '0');
     li.setAttribute('role', 'article');
-    li.style.height = `${ITEM_HEIGHT}px`;
-    li.style.overflow = 'hidden';
+    
+    li.style.border = '1px solid #eee';
+    li.style.padding = '15px';
+    li.style.marginBottom = '15px';
+    li.style.background = '#fff';
+    li.style.borderRadius = '8px';
+    li.style.boxShadow = '0 2px 5px rgba(0,0,0,0.05)';
 
     const q = (query || '').trim();
     const keywords = q === '' ? [] : q.split(/\s+/).filter(Boolean);
@@ -258,24 +255,28 @@ function createPostElement(post, query) {
     const fullContentHtml = post.formattedContent || renderContentWithCode(post.content, keywordHighlighter);
     const highlightedTags = (post.tags || []).map(tag => keywordHighlighter(escapeHtml(tag))).join(', ');
 
-    const imgHtml = post.image
-        ? `<img data-src="${post.image}" class="post-img lazy-img" alt="Img" loading="lazy" style="max-height: 100px;">`
-        : '';
+    // БЛОК ИЗОБРАЖЕНИЯ
+    const imgHtml = post.image 
+      ? `<img src="${post.image}" alt="Картинка поста" style="width:100%; height:200px; object-fit:cover; border-radius:6px; margin-bottom:12px; display:block;" loading="lazy">` 
+      : '';
 
     li.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
-        <h3 style="margin:0; font-size: 1.1em;">${highlightedTitle}</h3>
-        <div style="display:flex; gap:5px;">
-          <button class="format-post-btn" data-id="${post.id}" style="font-size:0.8em;">Формат</button>
-          <button class="like-btn" data-id="${post.id}" aria-pressed="${post.likes>0 ? 'true' : 'false'}" title="Лайк">❤ <span class="like-count">${post.likes}</span></button>
+      ${imgHtml}
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h3 style="margin:0; font-size: 1.2em;">${highlightedTitle}</h3>
+        <div style="display:flex; gap:8px;">
+          <button class="format-post-btn" data-id="${post.id}" style="font-size:0.9em; padding: 4px 8px; cursor:pointer;">Формат</button>
+          <button class="like-btn" data-id="${post.id}" aria-pressed="${post.likes>0 ? 'true' : 'false'}" title="Лайк" style="cursor:pointer; background:none; border:1px solid #ddd; padding: 4px 8px; border-radius:4px;">❤ <span class="like-count">${post.likes}</span></button>
         </div>
       </div>
-      ${imgHtml}
-      <div class="preview" style="font-size: 0.9em; color: #444;">${safePreview}</div>
-      <div class="full-content" style="display:none; margin-top:5px; font-size:0.9em;">${fullContentHtml}</div>
-      <button class="toggle-content-btn" style="margin-top:5px; font-size:0.8em; cursor:pointer; background:none; border:none; color:blue; text-decoration:underline;">Показать полностью</button>
-      <div style="margin-top:5px; font-size: 0.8em; color: #666;">
-         Теги: ${highlightedTags} | Дата: ${post.datePublished} | 👁 ${post.views}
+      
+      <div class="preview" style="font-size: 1em; color: #333; line-height: 1.5;">${safePreview}</div>
+      <div class="full-content" style="display:none; margin-top:10px; font-size:1em; line-height: 1.6;">${fullContentHtml}</div>
+      <button class="toggle-content-btn" style="margin-top:10px; font-size:0.9em; cursor:pointer; background:none; border:none; color:#007bff; text-decoration:underline; padding:0;">Показать полностью</button>
+      
+      <div style="margin-top:15px; padding-top:10px; border-top:1px solid #f0f0f0; font-size: 0.85em; color: #777; display:flex; justify-content:space-between; flex-wrap:wrap; gap:5px;">
+         <span>Теги: ${highlightedTags}</span>
+         <span>Дата: ${post.datePublished} | 👁 ${post.views}</span>
       </div>
     `;
 
@@ -294,56 +295,24 @@ function createPostElement(post, query) {
     return li;
 }
 
-function renderVirtualScroll(query) {
+function renderList(query) {
     if (!virtualScrollerContainer) return;
 
-    // Ensure container has a height; otherwise scrolling math breaks.
-    const containerHeight = virtualScrollerContainer.clientHeight || 600;
-    const scrollTop = virtualScrollerContainer.scrollTop;
-
     const totalAvailable = filteredPosts.length;
-
-    // visibleCount определяет логический загруженный край (не больше totalAvailable)
-    const logicalLoaded = Math.min(visibleCount, totalAvailable);
-
-    // Расчет индексов — рендерим от startIndex до endIndex внутри logicalLoaded
-    let startIndex = Math.floor(scrollTop / ITEM_HEIGHT) - BUFFER_ITEMS;
-    let endIndex = Math.ceil((scrollTop + containerHeight) / ITEM_HEIGHT) + BUFFER_ITEMS;
-
-    // Ограничиваем в пределах [0, logicalLoaded)
-    startIndex = Math.max(0, startIndex);
-    endIndex = Math.min(logicalLoaded, endIndex);
+    const effectiveLoaded = Math.min(loadedCount, totalAvailable);
 
     virtualScrollerContainer.innerHTML = '';
 
-    // Верхняя распорка: компенсируем элементы до startIndex
-    const topSpacer = document.createElement('div');
-    topSpacer.className = 'virtual-spacer';
-    topSpacer.style.height = `${startIndex * ITEM_HEIGHT}px`;
-    virtualScrollerContainer.appendChild(topSpacer);
-
-    // Рендер видимых элементов (startIndex .. endIndex-1)
-    const fragment = document.createDocumentFragment();
-    for (let i = startIndex; i < endIndex; i++) {
+    for (let i = 0; i < effectiveLoaded; i++) {
         const post = filteredPosts[i];
         const el = createPostElement(post, query);
-        if (el) fragment.appendChild(el);
+        if (el) virtualScrollerContainer.appendChild(el);
     }
-    virtualScrollerContainer.appendChild(fragment);
 
-    // Нижняя распорка: компенсируем все элементы после endIndex до logicalLoaded
-    const itemsBelow = Math.max(0, logicalLoaded - endIndex);
-    const bottomSpacer = document.createElement('div');
-    bottomSpacer.className = 'virtual-spacer';
-    bottomSpacer.style.height = `${itemsBelow * ITEM_HEIGHT}px`;
-    virtualScrollerContainer.appendChild(bottomSpacer);
+    if (postsCountInfo) postsCountInfo.textContent = `Постов всего: ${totalAvailable} | Показано: ${effectiveLoaded}`;
+    updateControlsState(effectiveLoaded, totalAvailable);
 
-    if (postsCountInfo) postsCountInfo.textContent = `Постов всего: ${filteredPosts.length} | Загружено: ${logicalLoaded}`;
-
-    observeImages();
-    updateControlsState(logicalLoaded, totalAvailable);
-
-    if (noResultsDiv) noResultsDiv.style.display = filteredPosts.length === 0 ? 'block' : 'none';
+    if (noResultsDiv) noResultsDiv.style.display = totalAvailable === 0 ? 'block' : 'none';
 }
 
 function updateControlsState(currentShown, total) {
@@ -353,7 +322,7 @@ function updateControlsState(currentShown, total) {
 
     if (currentShown >= total) {
         loadMoreBtn.style.display = 'none';
-        endMessage.style.display = 'block';
+        endMessage.style.display = total > 0 ? 'block' : 'none';
     } else {
         endMessage.style.display = 'none';
         if (manualLoadToggle && manualLoadToggle.checked) {
@@ -366,21 +335,18 @@ function updateControlsState(currentShown, total) {
 
 function loadMorePosts() {
     if (isFetching) return;
+    if (loadedCount >= filteredPosts.length) return;
+
     isFetching = true;
     if (loader) loader.style.display = 'block';
     if (loadMoreBtn) loadMoreBtn.disabled = true;
 
     setTimeout(() => {
-        try {
-            visibleCount += ITEMS_PER_PAGE;
-            renderVirtualScroll(searchInput ? searchInput.value : '');
-        } catch (e) {
-            console.error(e);
-        } finally {
-            if (loader) loader.style.display = 'none';
-            if (loadMoreBtn) loadMoreBtn.disabled = false;
-            isFetching = false;
-        }
+        loadedCount += ITEMS_PER_PAGE;
+        renderList(searchInput ? searchInput.value : '');
+        isFetching = false;
+        if (loader) loader.style.display = 'none';
+        if (loadMoreBtn) loadMoreBtn.disabled = false;
     }, 300);
 }
 
@@ -399,27 +365,8 @@ function applyFilters() {
     });
   }
 
-  // Сброс пагинации при фильтрации
-  visibleCount = ITEMS_PER_PAGE;
-
-  if (virtualScrollerContainer) virtualScrollerContainer.scrollTop = 0;
-  renderVirtualScroll(query);
-}
-
-function observeImages() {
-    const images = document.querySelectorAll('.lazy-img');
-    if (!images.length) return;
-    const imageObserver = new IntersectionObserver((entries, observer) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const img = entry.target;
-                img.src = img.dataset.src;
-                img.classList.remove('lazy-img');
-                observer.unobserve(img);
-            }
-        });
-    });
-    images.forEach(img => imageObserver.observe(img));
+  loadedCount = ITEMS_PER_PAGE;
+  renderList(query);
 }
 
 // --- EVENT LISTENERS ---
@@ -468,8 +415,7 @@ addPostForm && addPostForm.addEventListener('submit', (e) => {
     date: new Date(),
     datePublished: formatDate(new Date()),
     views: 0,
-    likes: 0,
-    image: "https://via.placeholder.com/600x300/9b59b6/ffffff?text=New"
+    likes: 0
   };
   posts.unshift(newPost);
   applyFilters();
@@ -504,38 +450,13 @@ if (loadMoreBtn) {
 
 if (manualLoadToggle) {
     manualLoadToggle.addEventListener('change', () => {
-        renderVirtualScroll(searchInput ? searchInput.value : '');
+        renderList(searchInput ? searchInput.value : '');
     });
 }
 
-// Infinite Scroll Logic
-if (virtualScrollerContainer) {
-    virtualScrollerContainer.addEventListener('scroll', () => {
-        try { localStorage.setItem('virtualScrollPos', virtualScrollerContainer.scrollTop); } catch (e) {}
-
-        if (manualLoadToggle && manualLoadToggle.checked) return;
-
-        const { scrollTop, scrollHeight, clientHeight } = virtualScrollerContainer;
-        if (scrollTop + clientHeight >= scrollHeight - 200) {
-            if (visibleCount < filteredPosts.length) {
-                loadMorePosts();
-            }
-        }
-    });
-}
-
-// Keyboard Navigation W/S
 document.addEventListener('keydown', (e) => {
     const tag = document.activeElement && document.activeElement.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-
-    if (e.key.toLowerCase() === 'w') {
-        e.preventDefault();
-        virtualScrollerContainer && virtualScrollerContainer.scrollBy({ top: -ITEM_HEIGHT, behavior: 'smooth' });
-    } else if (e.key.toLowerCase() === 's') {
-        e.preventDefault();
-        virtualScrollerContainer && virtualScrollerContainer.scrollBy({ top: ITEM_HEIGHT, behavior: 'smooth' });
-    }
 
     const ctrl = e.ctrlKey || e.metaKey;
     if (ctrl && e.key === '/') {
@@ -560,24 +481,6 @@ function debounce(fn, wait = 250) {
   };
 }
 
-// Init
 window.addEventListener('load', () => {
-    const savedPos = (() => {
-      try { return localStorage.getItem('virtualScrollPos'); } catch (e) { return null; }
-    })();
-
-    // Ensure virtual scroller has some height
-    if (virtualScrollerContainer && virtualScrollerContainer.clientHeight === 0) {
-      virtualScrollerContainer.style.minHeight = '600px';
-      virtualScrollerContainer.style.overflow = 'auto';
-    }
-
-    // Первый рендер
     applyFilters();
-
-    if (savedPos && virtualScrollerContainer) {
-        setTimeout(() => {
-            virtualScrollerContainer.scrollTop = parseInt(savedPos, 10) || 0;
-        }, 50);
-    }
 });
