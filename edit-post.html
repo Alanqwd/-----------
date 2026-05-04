@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Редактирование поста</title>
+    <link rel="stylesheet" href="css/style.css"/>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .edit-form { display: flex; flex-direction: column; gap: 15px; }
+        label { font-weight: bold; margin-bottom: 5px; display: block; }
+        input, textarea { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        textarea { height: 200px; font-family: monospace; }
+        .btn-group { display: flex; gap: 10px; margin-top: 20px; }
+        button { padding: 10px 20px; cursor: pointer; border: none; border-radius: 4px; font-size: 1em; }
+        .save-btn { background: #28a745; color: white; }
+        .cancel-btn { background: #dc3545; color: white; }
+        .preview-img { max-width: 200px; margin-top: 10px; border: 1px solid #ddd; }
+    </style>
+</head>
+<body>
+
+<h1>Редактирование поста</h1>
+
+<form id="editForm" class="edit-form">
+    <input type="hidden" id="postId">
+    
+    <div>
+        <label for="editTitle">Заголовок:</label>
+        <input type="text" id="editTitle" required>
+    </div>
+
+    <div>
+        <label for="editImage">URL изображения:</label>
+        <input type="text" id="editImage">
+        <img id="imagePreview" class="preview-img" src="" alt="Preview" style="display:none;">
+    </div>
+
+    <div>
+        <label for="editTags">Теги (через запятую):</label>
+        <input type="text" id="editTags">
+    </div>
+
+    <div>
+        <label for="editContent">Содержимое (поддерживает Markdown/HTML):</label>
+        <textarea id="editContent" required></textarea>
+    </div>
+
+    <div class="btn-group">
+        <button type="submit" class="save-btn">Сохранить изменения</button>
+        <button type="button" class="cancel-btn" onclick="window.close()">Отмена / Закрыть</button>
+    </div>
+</form>
+
+<script>
+    const form = document.getElementById('editForm');
+    const postIdInput = document.getElementById('postId');
+    const titleInput = document.getElementById('editTitle');
+    const imageInput = document.getElementById('editImage');
+    const tagsInput = document.getElementById('editTags');
+    const contentInput = document.getElementById('editContent');
+    const imagePreview = document.getElementById('imagePreview');
+
+    // Получаем ID поста из URL параметров
+    const urlParams = new URLSearchParams(window.location.search);
+    const postId = urlParams.get('id');
+
+    if (!postId) {
+        alert('Пост не найден');
+        window.close();
+    }
+
+    // Загрузка данных из localStorage
+    function loadPostData() {
+        const storedPosts = localStorage.getItem('postsData');
+        if (storedPosts) {
+            const posts = JSON.parse(storedPosts);
+            const post = posts.find(p => p.id == postId);
+            
+            if (post) {
+                postIdInput.value = post.id;
+                titleInput.value = post.title;
+                imageInput.value = post.image || '';
+                tagsInput.value = Array.isArray(post.tags) ? post.tags.join(', ') : '';
+                contentInput.value = post.content;
+                
+                if (post.image) {
+                    imagePreview.src = post.image;
+                    imagePreview.style.display = 'block';
+                }
+            } else {
+                alert('Пост не найден в хранилище');
+                window.close();
+            }
+        } else {
+            alert('Данные не загружены. Вернитесь на главную страницу.');
+            window.close();
+        }
+    }
+
+    // Предпросмотр изображения
+    imageInput.addEventListener('input', (e) => {
+        const url = e.target.value;
+        if (url) {
+            imagePreview.src = url;
+            imagePreview.style.display = 'block';
+        } else {
+            imagePreview.style.display = 'none';
+        }
+    });
+
+    // Сохранение изменений
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const storedPosts = localStorage.getItem('postsData');
+        if (storedPosts) {
+            let posts = JSON.parse(storedPosts);
+            const index = posts.findIndex(p => p.id == postId);
+            
+            if (index !== -1) {
+                posts[index].title = titleInput.value;
+                posts[index].image = imageInput.value;
+                posts[index].tags = tagsInput.value.split(',').map(t => t.trim()).filter(Boolean);
+                posts[index].content = contentInput.value;
+                
+                // Сохраняем обновленный массив
+                localStorage.setItem('postsData', JSON.stringify(posts));
+                
+                alert('Изменения сохранены! Обновите список постов.');
+                // Опционально: можно закрыть окно или оставить открытым
+                // window.close(); 
+            }
+        }
+    });
+
+    window.addEventListener('load', loadPostData);
+</script>
+
+</body>
+</html>

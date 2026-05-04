@@ -1,0 +1,189 @@
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Регистрация</title>
+    <link rel="stylesheet" href="css/style.css"/>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f4f4f4; }
+        .auth-container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 400px; max-width: 90%; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], input[type="email"], input[type="password"] { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        .error { color: red; font-size: 0.9em; display: none; margin-top: 5px; }
+        
+
+        .dynamic-field-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+        .dynamic-field-row input { flex: 1; }
+        .btn-remove { background: #dc3545; color: white; border: none; border-radius: 4px; width: 30px; height: 30px; cursor: pointer; font-weight: bold; }
+        .btn-add { background: #28a745; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 0.9em; margin-top: 5px; }
+        
+        button[type="submit"] { width: 100%; padding: 10px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; margin-top: 10px; }
+        button[type="submit"]:hover { background: #0056b3; }
+        h2 { text-align: center; margin-top: 0; }
+        hr { border: 0; border-top: 1px solid #eee; margin: 20px 0; }
+    </style>
+</head>
+<body>
+
+<div class="auth-container">
+    <h2>Регистрация</h2>
+    <form id="registerForm">
+
+        <div class="form-group">
+            <label for="username">Имя пользователя</label>
+            <input type="text" id="username" required>
+        </div>
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" required>
+        </div>
+        <div class="form-group">
+            <label for="password">Пароль</label>
+            <input type="password" id="password" required minlength="6">
+        </div>
+        <div class="form-group">
+            <label for="confirmPassword">Подтвердите пароль</label>
+            <input type="password" id="confirmPassword" required>
+            <div id="passwordError" class="error">Пароли не совпадают</div>
+        </div>
+
+        <hr>
+
+     
+        <div class="form-group">
+            <label>Дополнительные навыки (динамические поля)</label>
+            <div id="dynamicFieldsContainer">
+              
+            </div>
+            <button type="button" class="btn-add" id="addFieldBtn">+ Добавить навык</button>
+        </div>
+
+        <button type="submit">Зарегистрироваться</button>
+    </form>
+</div>
+
+<script>
+    const form = document.getElementById('registerForm');
+    const password = document.getElementById('password');
+    const confirmPassword = document.getElementById('confirmPassword');
+    const passwordError = document.getElementById('passwordError');
+    const dynamicContainer = document.getElementById('dynamicFieldsContainer');
+    const addFieldBtn = document.getElementById('addFieldBtn');
+
+
+
+    function createDynamicField(value = '') {
+        const div = document.createElement('div');
+        div.className = 'dynamic-field-row';
+        
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'Например: JavaScript, Дизайн...';
+        input.value = value;
+        input.name = 'skills[]'; 
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn-remove';
+        removeBtn.innerHTML = '&times;';
+        removeBtn.title = 'Удалить поле';
+        
+        removeBtn.addEventListener('click', () => {
+            div.remove();
+            saveDynamicFields(); 
+        });
+
+
+        input.addEventListener('input', saveDynamicFields);
+
+        div.appendChild(input);
+        div.appendChild(removeBtn);
+        return div;
+    }
+
+    addFieldBtn.addEventListener('click', () => {
+        const field = createDynamicField();
+        dynamicContainer.appendChild(field);
+        saveDynamicFields();
+    });
+
+
+
+    function saveDynamicFields() {
+        const inputs = dynamicContainer.querySelectorAll('input');
+        const values = Array.from(inputs).map(inp => inp.value).filter(v => v.trim() !== '');
+        localStorage.setItem('regDynamicFields', JSON.stringify(values));
+    }
+
+    function loadDynamicFields() {
+        const saved = JSON.parse(localStorage.getItem('regDynamicFields'));
+        if (saved && saved.length > 0) {
+            saved.forEach(val => {
+                dynamicContainer.appendChild(createDynamicField(val));
+            });
+        } else {
+          
+            dynamicContainer.appendChild(createDynamicField());
+        }
+    }
+
+
+    window.addEventListener('load', () => {
+        const savedData = JSON.parse(localStorage.getItem('regFormData'));
+        if (savedData) {
+            document.getElementById('username').value = savedData.username || '';
+            document.getElementById('email').value = savedData.email || '';
+            document.getElementById('password').value = savedData.password || '';
+            document.getElementById('confirmPassword').value = savedData.confirmPassword || '';
+        }
+        
+    
+        loadDynamicFields();
+        
+   
+        if (localStorage.getItem('isRegistered') === 'true') {
+            window.location.href = 'http://127.0.0.1:5500/my-website-main/mock.html';
+        }
+    });
+
+    // Сохранение основных данных при вводе
+    ['username', 'email', 'password', 'confirmPassword'].forEach(id => {
+        document.getElementById(id).addEventListener('input', () => {
+            const data = {
+                username: document.getElementById('username').value,
+                email: document.getElementById('email').value,
+                password: document.getElementById('password').value,
+                confirmPassword: document.getElementById('confirmPassword').value
+            };
+            localStorage.setItem('regFormData', JSON.stringify(data));
+        });
+    });
+
+    // Обработка отправки
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        if (password.value !== confirmPassword.value) {
+            passwordError.style.display = 'block';
+            return;
+        } else {
+            passwordError.style.display = 'none';
+        }
+
+        const skills = Array.from(dynamicContainer.querySelectorAll('input'))
+                            .map(inp => inp.value)
+                            .filter(v => v.trim() !== '');
+
+        console.log('Отправляемые навыки:', skills);
+
+        localStorage.setItem('isRegistered', 'true');
+        localStorage.removeItem('regFormData'); 
+        localStorage.removeItem('regDynamicFields');
+        
+        alert('Регистрация успешна! Навыки сохранены: ' + skills.join(', '));
+        window.location.href = 'http://127.0.0.1:5500/my-website-main/mock.html';
+    });
+</script>
+
+</body>
+</html>
