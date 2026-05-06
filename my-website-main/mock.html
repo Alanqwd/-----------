@@ -21,7 +21,6 @@
        </ul>
      </nav>
    </div>
-
 <h1>Поиск постов</h1>
 
 <input type="text" id="searchInput" placeholder="Поиск по названию, содержимому и тегам..." style="width: 100%; padding: 8px; margin-bottom: 10px;" />
@@ -32,7 +31,6 @@
   <button id="themeLight">Тема: светлая</button>
   <button id="themeDark">Тема: тёмная</button>
 </div>
-
 
 <div class="controls-row">
     <label style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 8px;">
@@ -50,11 +48,9 @@
   <button data-cat="просто так">Просто так</button>
 </div>
 
-
 <div id="virtual-scroller"></div>
 
 <div id="noResults" class="no-results" style="display: none; padding: 20px; text-align: center;">По вашему запросу ничего не найдено</div>
-
 
 <div class="load-more-container">
     <div id="loader" class="loader"></div>
@@ -62,28 +58,18 @@
     <div id="endMessage" style="display:none; color: gray; margin-top: 10px;">Больше постов нет</div>
 </div>
 
-
 <form id="addPostForm" style="display:none;" aria-hidden="true">
-   <input type="text" id="postTitle" placeholder="Заголовок" required>
+   <input type="text" id="postTitle" placeholder="Заголовок *" required minlength="3">
+   <div id="postTitleError" class="error" style="color:red;font-size:0.85em;display:none;">Минимум 3 символа</div>
    <input type="text" id="postTags" placeholder="Теги через запятую">
-   <textarea id="postContent" placeholder="Содержимое"></textarea>
+   <textarea id="postContent" placeholder="Содержимое *" required minlength="10"></textarea>
+   <div id="postContentError" class="error" style="color:red;font-size:0.85em;display:none;">Минимум 10 символов</div>
    <button type="submit">Добавить</button>
    <button type="button" id="cancelAddPost">Отмена</button>
 </form>
-
-
-<form id="addPostForm" style="display:none;" aria-hidden="true">
-   <input type="text" id="postTitle" placeholder="Заголовок" required>
-   <input type="text" id="postTags" placeholder="Теги через запятую">
-   <textarea id="postContent" placeholder="Содержимое"></textarea>
-   <button type="submit">Добавить</button>
-   <button type="button" id="cancelAddPost">Отмена</button>
-</form>
-
 
 </body>
 </html>
-
 
 
 

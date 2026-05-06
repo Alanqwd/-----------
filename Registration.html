@@ -27,11 +27,17 @@
 
 <div class="auth-container">
     <h2>Регистрация</h2>
+    
+    <div class="theme-toggle">
+        <button type="button" id="themeLight" class="active">Светлая</button>
+        <button type="button" id="themeDark">Тёмная</button>
+    </div>
+    
     <form id="registerForm">
-
         <div class="form-group">
             <label for="username">Имя пользователя</label>
             <input type="text" id="username" required>
+            <div id="usernameError" class="error">Это имя уже занято</div>
         </div>
         <div class="form-group">
             <label for="email">Email</label>
@@ -40,6 +46,7 @@
         <div class="form-group">
             <label for="password">Пароль</label>
             <input type="password" id="password" required minlength="6">
+            <div id="passwordLengthError" class="error">Минимум 6 символов</div>
         </div>
         <div class="form-group">
             <label for="confirmPassword">Подтвердите пароль</label>
@@ -49,12 +56,9 @@
 
         <hr>
 
-     
         <div class="form-group">
             <label>Дополнительные навыки (динамические поля)</label>
-            <div id="dynamicFieldsContainer">
-              
-            </div>
+            <div id="dynamicFieldsContainer"></div>
             <button type="button" class="btn-add" id="addFieldBtn">+ Добавить навык</button>
         </div>
 
@@ -64,38 +68,36 @@
 
 <script>
     const form = document.getElementById('registerForm');
+    const username = document.getElementById('username');
+    const email = document.getElementById('email');
     const password = document.getElementById('password');
     const confirmPassword = document.getElementById('confirmPassword');
     const passwordError = document.getElementById('passwordError');
+    const passwordLengthError = document.getElementById('passwordLengthError');
+    const usernameError = document.getElementById('usernameError');
     const dynamicContainer = document.getElementById('dynamicFieldsContainer');
     const addFieldBtn = document.getElementById('addFieldBtn');
-
-
+    const themeLight = document.getElementById('themeLight');
+    const themeDark = document.getElementById('themeDark');
 
     function createDynamicField(value = '') {
         const div = document.createElement('div');
         div.className = 'dynamic-field-row';
-        
         const input = document.createElement('input');
         input.type = 'text';
         input.placeholder = 'Например: JavaScript, Дизайн...';
         input.value = value;
-        input.name = 'skills[]'; 
-        
+        input.name = 'skills[]';
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.className = 'btn-remove';
         removeBtn.innerHTML = '&times;';
         removeBtn.title = 'Удалить поле';
-        
         removeBtn.addEventListener('click', () => {
             div.remove();
-            saveDynamicFields(); 
+            saveDynamicFields();
         });
-
-
         input.addEventListener('input', saveDynamicFields);
-
         div.appendChild(input);
         div.appendChild(removeBtn);
         return div;
@@ -106,8 +108,6 @@
         dynamicContainer.appendChild(field);
         saveDynamicFields();
     });
-
-
 
     function saveDynamicFields() {
         const inputs = dynamicContainer.querySelectorAll('input');
@@ -122,65 +122,129 @@
                 dynamicContainer.appendChild(createDynamicField(val));
             });
         } else {
-          
             dynamicContainer.appendChild(createDynamicField());
         }
     }
 
+    function setTheme(theme) {
+        document.body.style.background = theme === 'dark' ? '#1a1a2e' : '#f4f4f4';
+        document.querySelector('.auth-container').style.background = theme === 'dark' ? '#16213e' : 'white';
+        document.querySelector('.auth-container').style.color = theme === 'dark' ? '#fff' : '#000';
+        localStorage.setItem('theme', theme);
+        themeLight.classList.toggle('active', theme === 'light');
+        themeDark.classList.toggle('active', theme === 'dark');
+    }
+
+    themeLight.addEventListener('click', () => setTheme('light'));
+    themeDark.addEventListener('click', () => setTheme('dark'));
+
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+    }
+
+    function setCookie(name, value, days) {
+        const expires = new Date(Date.now() + days * 864e5).toUTCString();
+        document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Strict`;
+    }
+
+    function deleteCookie(name) {
+        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Strict`;
+    }
 
     window.addEventListener('load', () => {
+        const savedTheme = getCookie('theme') || localStorage.getItem('theme') || 'light';
+        setTheme(savedTheme);
+        
         const savedData = JSON.parse(localStorage.getItem('regFormData'));
         if (savedData) {
-            document.getElementById('username').value = savedData.username || '';
-            document.getElementById('email').value = savedData.email || '';
-            document.getElementById('password').value = savedData.password || '';
-            document.getElementById('confirmPassword').value = savedData.confirmPassword || '';
+            username.value = savedData.username || '';
+            email.value = savedData.email || '';
+            password.value = savedData.password || '';
+            confirmPassword.value = savedData.confirmPassword || '';
         }
-        
-    
         loadDynamicFields();
         
-   
         if (localStorage.getItem('isRegistered') === 'true') {
             window.location.href = 'http://127.0.0.1:5500/my-website-main/mock.html';
         }
     });
 
-    // Сохранение основных данных при вводе
     ['username', 'email', 'password', 'confirmPassword'].forEach(id => {
         document.getElementById(id).addEventListener('input', () => {
             const data = {
-                username: document.getElementById('username').value,
-                email: document.getElementById('email').value,
-                password: document.getElementById('password').value,
-                confirmPassword: document.getElementById('confirmPassword').value
+                username: username.value,
+                email: email.value,
+                password: password.value,
+                confirmPassword: confirmPassword.value
             };
             localStorage.setItem('regFormData', JSON.stringify(data));
         });
     });
 
-    // Обработка отправки
+    username.addEventListener('blur', () => {
+        const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
+        const isTaken = registeredUsers.some(u => u.username === username.value.trim());
+        usernameError.style.display = isTaken && username.value.trim() !== '' ? 'block' : 'none';
+    });
+
+    password.addEventListener('input', () => {
+        passwordLengthError.style.display = password.value.length > 0 && password.value.length < 6 ? 'block' : 'none';
+    });
+
     form.addEventListener('submit', (e) => {
         e.preventDefault();
         
+        let valid = true;
+        
+        if (password.value.length < 6) {
+            passwordLengthError.style.display = 'block';
+            valid = false;
+        } else {
+            passwordLengthError.style.display = 'none';
+        }
+        
         if (password.value !== confirmPassword.value) {
             passwordError.style.display = 'block';
-            return;
+            valid = false;
         } else {
             passwordError.style.display = 'none';
         }
+        
+        const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
+        const isTaken = registeredUsers.some(u => u.username === username.value.trim());
+        if (isTaken && username.value.trim() !== '') {
+            usernameError.style.display = 'block';
+            valid = false;
+        } else {
+            usernameError.style.display = 'none';
+        }
+        
+        if (!valid) return;
 
         const skills = Array.from(dynamicContainer.querySelectorAll('input'))
                             .map(inp => inp.value)
                             .filter(v => v.trim() !== '');
 
-        console.log('Отправляемые навыки:', skills);
-
-        localStorage.setItem('isRegistered', 'true');
-        localStorage.removeItem('regFormData'); 
-        localStorage.removeItem('regDynamicFields');
+        const newUser = {
+            username: username.value.trim(),
+            email: email.value.trim(),
+            password: password.value,
+            skills: skills,
+            registeredAt: new Date().toISOString()
+        };
         
-        alert('Регистрация успешна! Навыки сохранены: ' + skills.join(', '));
+        registeredUsers.push(newUser);
+        localStorage.setItem('registeredUsers', JSON.stringify(registeredUsers));
+        
+        const token = btoa(`${newUser.username}:${Date.now()}:${Math.random().toString(36).substr(2)}`);
+        setCookie('authToken', token, 1);
+        localStorage.setItem('currentUser', JSON.stringify({ username: newUser.username, email: newUser.email }));
+        
+        localStorage.setItem('isRegistered', 'true');
+        localStorage.removeItem('regFormData');
+        localStorage.removeItem('regDynamicFields');
         window.location.href = 'http://127.0.0.1:5500/my-website-main/mock.html';
     });
 </script>
