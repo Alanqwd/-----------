@@ -31,10 +31,12 @@ const App: React.FC = () => {
   useEffect(() => {
     if (user) {
       loadChats();
+
       const newConnection = new HubConnectionBuilder()
         .withUrl('http://localhost:5000/chathub')
         .withAutomaticReconnect()
         .build();
+        
 
       newConnection.start().then(() => {
         setConnection(newConnection);
