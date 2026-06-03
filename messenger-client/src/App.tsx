@@ -36,6 +36,7 @@ const App: React.FC = () => {
         .withUrl('http://localhost:5000/chathub')
         .withAutomaticReconnect()
         .build();
+
         
 
       newConnection.start().then(() => {
