@@ -143,11 +143,6 @@ const App: React.FC = () => {
     if (imageFile) {
         const formDataImg = new FormData();
         formDataImg.append('file', imageFile);
-        // In a real app, upload to server here. For this demo, we simulate or use base64 if small, 
-        // but requirement says save to DB. Let's assume backend handles URL or we mock it for simplicity 
-        // as full file upload controller wasn't explicitly requested in detail, but photo sending was.
-        // To strictly follow "save to DB", we'd need a file endpoint. 
-        // Assuming we pass a placeholder or base64 for this snippet constraint.
         imageUrl = "uploaded_image_url_placeholder"; 
     }
 

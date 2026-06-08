@@ -1,13 +1,13 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: 'https://localhost:5000/api',
 });
 
 export const authApi = {
-  register: (data: any) => api.post('/auth/register', data),
-  login: (data: any) => api.post('/auth/login', data),
-  updateProfile: (data: any) => api.put('/auth/profile', data),
+  register: (data: any) => api.post('/Auth/register', data),
+  login: (data: any) => api.post('/Auth/login', data),
+  updateProfile: (data: any) => api.put('/Auth/profile', data),
 };
 
 export const chatApi = {
