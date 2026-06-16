@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { HubConnectionBuilder } from '@microsoft/signalr';
 import { authApi, chatApi } from './services/api';
 import type { User, ChatRoom, Message } from './types';
+import { HubConnectionBuilder, HttpTransportType } from '@microsoft/signalr';
 import './App.css';
 
 const App: React.FC = () => {
@@ -32,11 +32,13 @@ const App: React.FC = () => {
     if (user) {
       loadChats();
 
-      const newConnection = new HubConnectionBuilder()
-        .withUrl('http://localhost:5000/chathub')
-        .withAutomaticReconnect()
-        .build();
-
+     const newConnection = new HubConnectionBuilder()
+    .withUrl('http://localhost:5001/chathub', {
+        skipNegotiation: true,
+        transport: HttpTransportType.WebSockets 
+    })
+    .withAutomaticReconnect()
+    .build();
         
 
       newConnection.start().then(() => {
