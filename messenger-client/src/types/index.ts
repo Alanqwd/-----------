@@ -10,6 +10,8 @@ export interface ChatRoom {
   name: string;
   accessCode: string;
   unreadCount: number;
+  avatarUrl?: string; 
+  description?: string; 
 }
 
 export interface Message {
@@ -20,4 +22,12 @@ export interface Message {
   senderName: string;
   senderAvatar?: string;
   senderId: number;
+}
+
+
+export interface ChatMember {
+  userId: number;
+  username: string;
+  avatarUrl?: string;
+  isOnline: boolean;
 }

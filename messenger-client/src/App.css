@@ -42,6 +42,35 @@ body {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+.connection-status {
+  margin-left: auto;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.connection-status.connected {
+  color: #4caf50;
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.connection-status.reconnecting {
+  color: #ff9800;
+  background: rgba(255, 152, 0, 0.1);
+  animation: pulse 1.5s infinite;
+}
+
+.connection-status.disconnected {
+  color: #f44336;
+  background: rgba(244, 67, 54, 0.1);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
 
 input {
   width: 100%;
