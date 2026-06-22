@@ -3,8 +3,8 @@ export interface User {
   username: string;
   avatarUrl?: string;
   bio?: string;
+  sessionToken?: string; 
 }
-
 export interface ChatRoom {
   id: number;
   name: string;
