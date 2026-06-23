@@ -45,35 +45,31 @@ const App: React.FC = () => {
     userRef.current = user;
   }, [user]);
 
-
  useEffect(() => {
-  const savedUser = localStorage.getItem('moon_user');
+  const savedUser = sessionStorage.getItem('moon_user');
   if (savedUser) {
     try {
       const parsedUser = JSON.parse(savedUser);
     
       if (parsedUser.sessionToken) {
-
         chatApi.getMyChats(parsedUser.userId)
           .then(() => {
-        
             setUser(parsedUser);
             setView('dashboard');
           })
-          .catch(() => {
-
-            console.log('Сессия истекла, требуется повторный вход');
-            localStorage.removeItem('moon_user');
+          .catch((err) => {
+            console.log('Сессия истекла, требуется повторный вход', err);
+            sessionStorage.removeItem('moon_user');
             setUser(null);
             setView('login');
           });
       } else {
-        localStorage.removeItem('moon_user');
+        sessionStorage.removeItem('moon_user');
         setView('login');
       }
     } catch (e) {
       console.error('Failed to parse saved user', e);
-      localStorage.removeItem('moon_user');
+      sessionStorage.removeItem('moon_user');
       setView('login');
     }
   }
@@ -84,15 +80,13 @@ useEffect(() => {
     console.log('Сессия истекла — выход на экран логина');
     setUser(null);
     setView('login');
-    localStorage.removeItem('moon_user');
+    sessionStorage.removeItem('moon_user');
     alert('Ваша сессия истекла. Возможно, вы вошли с другого устройства.');
   };
 
   window.addEventListener('session-expired', handleSessionExpired);
   return () => window.removeEventListener('session-expired', handleSessionExpired);
 }, []);
-
-
 
   useEffect(() => {
     if (!user) return;
@@ -112,15 +106,16 @@ useEffect(() => {
       setConnectionStatus('connected');
       
       try {
-        if (newConnection.state === HubConnectionState.Connected) {
-          await newConnection.invoke('UserConnected', user.userId);
+        if (newConnection.state === HubConnectionState.Connected && userRef.current) {
+          await newConnection.invoke('UserConnected', userRef.current.userId, userRef.current.sessionToken);
         }
       } catch (err) {
-        if (err instanceof Error && err.message.includes("Invocation canceled")) {
+        const error = err as any;
+        if (error instanceof Error && error.message.includes("Invocation canceled")) {
           console.log("UserConnected отменен при переподключении");
           return;
         }
-        console.error("Error re-notifying user connection:", err);
+        console.error("Error re-notifying user connection:", error);
       }
       
       if (activeChatRef.current && userRef.current) {
@@ -129,11 +124,12 @@ useEffect(() => {
             await newConnection.invoke('JoinChat', activeChatRef.current.id, userRef.current.userId);
           }
         } catch (err) {
-          if (err instanceof Error && err.message.includes("Invocation canceled")) {
+          const error = err as any;
+          if (error instanceof Error && error.message.includes("Invocation canceled")) {
             console.log("JoinChat отменен при переподключении");
             return;
           }
-          console.error("Ошибка при повторном входе в чат:", err);
+          console.error("Ошибка при повторном входе в чат:", error);
         }
       }
       
@@ -151,25 +147,23 @@ useEffect(() => {
     });
 
     newConnection.on('ReceiveMessage', (msg: Message) => {
-  console.log("Получено сообщение:", msg);
-  
-
-  setMessages(prev => {
-    if (prev.some(m => m.id === msg.id)) {
-      return prev; 
-    }
-    return [...prev, msg];
-  });
-  
-
-  if (msg.senderId !== userRef.current?.userId) {
-    setChats(prev => prev.map(c => 
-      c.id === (msg as any).ChatRoomId 
-        ? {...c, unreadCount: c.unreadCount + 1} 
-        : c
-    ));
-  }
-});
+      console.log("Получено сообщение:", msg);
+      
+      setMessages(prev => {
+        if (prev.some(m => m.id === msg.id)) {
+          return prev; 
+        }
+        return [...prev, msg];
+      });
+      
+      if (msg.senderId !== userRef.current?.userId) {
+        setChats(prev => prev.map(c => 
+          c.id === (msg as any).ChatRoomId 
+            ? {...c, unreadCount: c.unreadCount + 1} 
+            : c
+        ));
+      }
+    });
 
     newConnection.on('UpdateUnreadBadge', (chatId: number) => {
       setChats(prev => prev.map(c => 
@@ -181,7 +175,6 @@ useEffect(() => {
       loadChats();
     });
 
-
     newConnection.on('UserStatusChanged', (userId: number, isOnline: boolean) => {
       console.log(`User ${userId} is now ${isOnline ? 'online' : 'offline'}`);
       
@@ -190,66 +183,99 @@ useEffect(() => {
       ));
     });
 
-newConnection.start()
-  .then(async () => {
-    console.log("SignalR Connected");
-    setConnectionStatus('connected');
-    setConnection(newConnection);
-    
-    if (newConnection.state === HubConnectionState.Connected) {
-      try {
-        await newConnection.invoke('UserConnected', user.userId);
-        console.log("UserConnected вызван успешно");
-      } catch (err) {
-        if (err instanceof Error && err.message.includes("Invocation canceled")) {
-          console.log("UserConnected отменен (соединение закрылось)");
-          return;
-        }
-        console.error("Error notifying user connection:", err);
-      }
-    }
-  })
-  .catch(err => {
-    // ✅ Подавляем AbortError от Strict Mode
-    if (err instanceof Error && err.name === 'AbortError') {
-      console.log("Соединение отменено Strict Mode (это нормально в dev)");
-      return;
-    }
-    console.error("SignalR Connection Error:", err);
-    setConnectionStatus('disconnected');
-  });
+newConnection.on('UserJoinedChat', (userId: number, username: string, avatarUrl: string | null) => {
+  console.log(`[Chat] User ${username} joined the chat`);
+  
+  
+  setMessages(prev => [...prev, {
+    id: Date.now() + Math.random(), 
+    content: `${username} присоединился к чату`,
+    sentAt: new Date().toISOString(),
+    senderId: 0, 
+    senderName: 'Система',
+    senderAvatar: null,
+    isSystemMessage: true 
+  } as any]);
+});
 
-return () => {
-  console.log("Остановка SignalR соединения...");
-  if (newConnection) {
-    // ✅ Проверяем состояние перед stop
-    if (newConnection.state === HubConnectionState.Connected || 
-        newConnection.state === HubConnectionState.Connecting) {
-      newConnection.stop().catch(err => {
-        // ✅ Подавляем все ошибки при остановке
-        if (err instanceof Error && 
-            (err.message.includes("Invocation canceled") || err.name === 'AbortError')) {
-          console.log("Соединение уже закрыто");
+
+newConnection.on('UserLeftChat', (userId: number, username: string, avatarUrl: string | null) => {
+  console.log(`[Chat] User ${username} left the chat`);
+  
+  setMessages(prev => [...prev, {
+    id: Date.now() + Math.random(),
+    content: `${username} покинул чат`,
+    sentAt: new Date().toISOString(),
+    senderId: 0,
+    senderName: 'Система',
+    senderAvatar: null,
+    isSystemMessage: true
+  } as any]);
+});
+
+    newConnection.start()
+      .then(async () => {
+        console.log("SignalR Connected");
+        setConnectionStatus('connected');
+        setConnection(newConnection);
+        
+        if (newConnection.state === HubConnectionState.Connected && user) {
+          try {
+            await newConnection.invoke('UserConnected', user.userId, user.sessionToken);
+            console.log("UserConnected вызван успешно");
+          } catch (err) {
+            const error = err as any;
+            if (error instanceof Error && error.message.includes("Invocation canceled")) {
+              console.log("UserConnected отменен (соединение закрылось)");
+              return;
+            }
+            console.error("Error notifying user connection:", error);
+            if (error.message.includes("Invalid or expired session")) {
+               handleSessionExpiredLogic();
+            }
+          }
+        }
+      })
+      .catch(err => {
+        if (err instanceof Error && err.name === 'AbortError') {
+          console.log("Соединение отменено Strict Mode (это нормально в dev)");
           return;
         }
-        console.error("Error stopping connection:", err);
+        console.error("SignalR Connection Error:", err);
+        setConnectionStatus('disconnected');
       });
-    }
-  }
-};
+
+    return () => {
+      console.log("Остановка SignalR соединения...");
+      if (newConnection) {
+        if (newConnection.state === HubConnectionState.Connected || 
+            newConnection.state === HubConnectionState.Connecting) {
+          newConnection.stop().catch(err => {
+            if (err instanceof Error && 
+                (err.message.includes("Invocation canceled") || err.name === 'AbortError')) {
+              console.log("Соединение уже закрыто");
+              return;
+            }
+            console.error("Error stopping connection:", err);
+          });
+        }
+      }
+    };
   }, [user]);
 
-
-
+  const handleSessionExpiredLogic = () => {
+      setUser(null);
+      setView('login');
+      sessionStorage.removeItem('moon_user');
+      alert('Ваша сессия истекла. Возможно, вы вошли с другого устройства.');
+  };
 
 useEffect(() => {
   if (!connection || !activeChat || !user) {
-    console.log("JoinChat useEffect: пропуск - нет connection/activeChat/user");
     return;
   }
   
   if (connection.state !== HubConnectionState.Connected) {
-    console.log("JoinChat useEffect: пропуск - соединение не подключено");
     return;
   }
 
@@ -260,7 +286,8 @@ useEffect(() => {
       console.log(`[JoinChat] ✅ Успешно вошли в чат: ${activeChat.name}`);
       loadChatMembers(activeChat.id);
     } catch (error) {
-      if (error instanceof Error && error.message.includes("Invocation canceled")) {
+      const err = error as any;
+      if (err instanceof Error && err.message.includes("Invocation canceled")) {
         console.log("[JoinChat] Отменено (Invocation canceled)");
         return;
       }
@@ -271,7 +298,6 @@ useEffect(() => {
   joinChat();
 }, [activeChat, connection, user]); 
 
-
   const loadChats = async () => {
     if (user) {
       try {
@@ -280,7 +306,6 @@ useEffect(() => {
       } catch (e) { console.error(e); }
     }
   };
-
 
   const loadChatMembers = async (chatId: number) => {
     try {
@@ -295,11 +320,12 @@ useEffect(() => {
             isOnline: onlineUserIds.includes(m.userId)
           }));
         } catch (err) {
-          if (err instanceof Error && err.message.includes("Invocation canceled")) {
+          const error = err as any;
+          if (error instanceof Error && error.message.includes("Invocation canceled")) {
             console.log("GetOnlineUsersInChat отменен");
             return;
           }
-          console.error("Error getting online users:", err);
+          console.error("Error getting online users:", error);
         }
       }
       
@@ -314,18 +340,26 @@ useEffect(() => {
   try {
     const res = await authApi.login({ username: formData.username, password: formData.password });
     
-
     const userData = { ...res.data, sessionToken: res.data.sessionToken };
     
     setUser(userData);
-    localStorage.setItem('moon_user', JSON.stringify(userData)); 
+    sessionStorage.setItem('moon_user', JSON.stringify(userData)); 
     setView('dashboard');
-  } catch (err) { alert('Login failed'); }
+  } catch (err) {
+    const error = err as any;
+    const errorMessage = error.response?.data || error.message || 'Login failed';
+    alert(errorMessage);
+  }
 };
+
 
 const handleRegister = async (e: React.FormEvent) => {
   e.preventDefault();
   try {
+    
+    sessionStorage.removeItem('moon_user');
+    setUser(null); 
+
     const res = await authApi.register({ 
       username: formData.username, 
       password: formData.password,
@@ -339,7 +373,7 @@ const handleRegister = async (e: React.FormEvent) => {
     };
     
     setUser(userData);
-    localStorage.setItem('moon_user', JSON.stringify(userData));
+    sessionStorage.setItem('moon_user', JSON.stringify(userData));
     setView('dashboard');
   } catch (err) { 
     console.error('Registration failed:', err);
@@ -393,6 +427,10 @@ const handleRegister = async (e: React.FormEvent) => {
 
   const selectChat = async (chat: ChatRoom) => {
 
+  if (activeChat && activeChat.id !== chat.id && user) {
+    await leaveChatHub();
+  }
+
   setChats(prev => prev.map(c => 
     c.id === chat.id ? { ...c, unreadCount: 0 } : c
   ));
@@ -400,9 +438,13 @@ const handleRegister = async (e: React.FormEvent) => {
   setActiveChat(chat);
   
   try {
-
     const res = await chatApi.getMessages(chat.id);
     setMessages(res.data);
+
+
+    if (connection && connection.state === HubConnectionState.Connected && user) {
+      await connection.invoke('JoinChat', chat.id, user.userId);
+    }
 
     await fetch(`http://localhost:5001/api/chat/mark-as-read`, {
       method: 'POST',
@@ -421,93 +463,101 @@ const handleRegister = async (e: React.FormEvent) => {
   }
 };
 
-  const sendMessage = async (e: React.FormEvent) => {
-  console.log("[SendMessage] Отправка сообщения, connection state:", connection?.state);
-  e.preventDefault();
-  if (!connection || !activeChat || !user || (!newMessage && !imageFile)) return;
-
-  let imageUrl = null;
-  
-  if (imageFile) {
+const leaveChatHub = async () => {
+  if (connection && connection.state === HubConnectionState.Connected && activeChat && user) {
     try {
-      const result = await fileApi.upload(imageFile);
-      imageUrl = result.url;
+      await connection.invoke('LeaveChatFromHub', activeChat.id, user.userId);
     } catch (error) {
-      console.error("Ошибка загрузки файла:", error);
-      alert("Не удалось загрузить файл");
-      return;
+      console.error("Error leaving chat via Hub:", error);
     }
-  }
-
-  
-  const tempMessage: Message = {
-    id: Date.now(), 
-    content: newMessage,
-    imageUrl: imageUrl || undefined,
-    sentAt: new Date().toISOString(),
-    senderName: user.username,
-    senderAvatar: user.avatarUrl,
-    senderId: user.userId
-  };
-
-
-  setMessages(prev => [...prev, tempMessage]);
-  setNewMessage('');
-  setImageFile(null);
-
-  try {
-    if (connection.state === HubConnectionState.Disconnected) {
-      await connection.start();
-    } else if (connection.state === HubConnectionState.Reconnecting) {
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error("Таймаут")), 10000);
-        connection.onreconnected(() => { clearTimeout(timeout); resolve(); });
-        connection.onclose(() => { clearTimeout(timeout); reject(new Error("Закрыто")); });
-      });
-    }
-    
-    if (connection.state !== HubConnectionState.Connected) {
-      throw new Error("Соединение не активно");
-    }
-    
-
-    await connection.invoke('SendMessage', activeChat.id, user.userId, newMessage, imageUrl);
-    
-
-    setMessages(prev => prev.filter(m => m.id !== tempMessage.id));
-    
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("Invocation canceled")) {
-      return;
-    }
-    console.error("Ошибка при отправке сообщения:", error);
-    alert("Не удалось отправить сообщение");
-
-    setMessages(prev => prev.filter(m => m.id !== tempMessage.id));
   }
 };
 
-  const handleLeaveChat = async () => {
-    if (!activeChat || !user) return;
+  const sendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!connection || !activeChat || !user || (!newMessage && !imageFile)) return;
+
+    let imageUrl = null;
     
-    if (!confirm('Вы уверены что хотите выйти из чата?')) return;
+    if (imageFile) {
+      try {
+        const result = await fileApi.upload(imageFile);
+        imageUrl = result.url;
+      } catch (error) {
+        console.error("Ошибка загрузки файла:", error);
+        alert("Не удалось загрузить файл");
+        return;
+      }
+    }
+
+    const tempMessage: Message = {
+      id: Date.now(), 
+      content: newMessage,
+      imageUrl: imageUrl || undefined,
+      sentAt: new Date().toISOString(),
+      senderName: user.username,
+      senderAvatar: user.avatarUrl,
+      senderId: user.userId
+    };
+
+    setMessages(prev => [...prev, tempMessage]);
+    setNewMessage('');
+    setImageFile(null);
 
     try {
-      await chatApi.leaveChat({
-        chatId: activeChat.id,
-        userId: user.userId
-      });
+      if (connection.state === HubConnectionState.Disconnected) {
+        await connection.start();
+      } else if (connection.state === HubConnectionState.Reconnecting) {
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error("Таймаут")), 10000);
+          connection.onreconnected(() => { clearTimeout(timeout); resolve(); });
+          connection.onclose(() => { clearTimeout(timeout); reject(new Error("Закрыто")); });
+        });
+      }
       
-      setActiveChat(null);
-      setMessages([]);
-      loadChats();
-      setShowChatInfoModal(false);
+      if (connection.state !== HubConnectionState.Connected) {
+        throw new Error("Соединение не активно");
+      }
+      
+      await connection.invoke('SendMessage', activeChat.id, user.userId, newMessage, imageUrl);
+      
+      setMessages(prev => prev.filter(m => m.id !== tempMessage.id));
+      
     } catch (error) {
-      console.error("Ошибка при выходе из чата:", error);
-      alert("Не удалось выйти из чата");
+      const err = error as any;
+      if (err instanceof Error && err.message.includes("Invocation canceled")) {
+        return;
+      }
+      console.error("Ошибка при отправке сообщения:", error);
+      alert("Не удалось отправить сообщение");
+      setMessages(prev => prev.filter(m => m.id !== tempMessage.id));
     }
   };
 
+
+const handleLeaveChat = async () => {
+  if (!activeChat || !user) return;
+  
+  if (!confirm('Вы уверены что хотите выйти из чата?')) return;
+
+
+  await leaveChatHub();
+
+  try {
+    await chatApi.leaveChat({
+      chatId: activeChat.id,
+      userId: user.userId
+    });
+    
+    setActiveChat(null);
+    setMessages([]);
+    loadChats();
+    setShowChatInfoModal(false);
+  } catch (error) {
+    console.error("Ошибка при выходе из чата:", error);
+    alert("Не удалось выйти из чата");
+  }
+};
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if(!user) return;
@@ -523,11 +573,21 @@ const handleRegister = async (e: React.FormEvent) => {
     } catch(err) { alert('Update failed'); }
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    setView('login');
-    localStorage.removeItem('moon_user');
-  };
+const handleLogout = () => {
+  
+  if (activeChat && user) {
+    leaveChatHub();
+  }
+  
+  setUser(null);
+  setView('login');
+  sessionStorage.removeItem('moon_user');
+  
+  if (connection) {
+    connection.stop();
+    setConnection(null);
+  }
+};
 
   if (view === 'login') {
     return (
@@ -597,7 +657,7 @@ const handleRegister = async (e: React.FormEvent) => {
           {chats.map(chat => (
             <div key={chat.id} className={`chat-item ${activeChat?.id === chat.id ? 'active' : ''}`} onClick={() => selectChat(chat)}>
               <img 
-                src={chat.avatarUrl || 'https://i.pinimg.com/736x/39/41/2a/39412a88ee11e656dbf45099958ea76d.jpg'} 
+                src={chat.avatarUrl || ''} 
                 alt={chat.name} 
                 className="chat-avatar"
               />
@@ -631,20 +691,34 @@ const handleRegister = async (e: React.FormEvent) => {
               </span>
             </header>
             <div className="messages-list">
-              {messages.map(msg => (
-                <div key={msg.id} className={`message ${msg.senderId === user?.userId ? 'own' : 'other'}`}>
-                  <div className="msg-meta">
-                    <img src={msg.senderAvatar || 'https://svgsilh.com/svg/2426371.svg'} alt="" className="msg-avatar"/>
-                    <span className="msg-sender">{msg.senderName}</span>
-                  </div>
-                  <div className="msg-content">
-                    {msg.content && <p>{msg.content}</p>}
-                    {msg.imageUrl && <img src={msg.imageUrl} alt="attachment" className="msg-image"/>}
-                    <span className="msg-time">{new Date(msg.sentAt).toLocaleTimeString()}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+  {messages.map(msg => {
+
+    const isSystem = (msg as any).isSystemMessage === true;
+    
+
+    const messageClass = isSystem 
+      ? 'system' 
+      : (msg.senderId === user?.userId ? 'own' : 'other');
+    
+    return (
+      <div key={msg.id} className={`message ${messageClass}`}>
+        {!isSystem && (
+          <div className="msg-meta">
+            <img src={msg.senderAvatar || 'https://svgsilh.com/svg/2426371.svg'} alt="" className="msg-avatar"/>
+            <span className="msg-sender">{msg.senderName}</span>
+          </div>
+        )}
+        <div className="msg-content">
+          {msg.content && <p>{msg.content}</p>}
+          {msg.imageUrl && <img src={msg.imageUrl} alt="attachment" className="msg-image"/>}
+          {!isSystem && (
+            <span className="msg-time">{new Date(msg.sentAt).toLocaleTimeString()}</span>
+          )}
+        </div>
+      </div>
+    );
+  })}
+</div>
             <form className="message-input-area" onSubmit={sendMessage}>
               <input 
                 type="text" 

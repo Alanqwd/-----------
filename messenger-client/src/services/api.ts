@@ -4,9 +4,9 @@ const api = axios.create({
   baseURL: 'http://localhost:5001/api',
 });
 
-
 api.interceptors.request.use((config) => {
-  const userStr = localStorage.getItem('moon_user');
+ 
+  const userStr = sessionStorage.getItem('moon_user');
   if (userStr) {
     try {
       const user = JSON.parse(userStr);
@@ -14,20 +14,18 @@ api.interceptors.request.use((config) => {
         config.headers['Authorization'] = `Bearer ${user.sessionToken}`;
       }
     } catch (e) {
-      console.error('Error parsing user from localStorage', e);
+      console.error('Error parsing user from sessionStorage', e);
     }
   }
   return config;
 });
-
 
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
       console.log('Сессия недействительна — выход');
-      localStorage.removeItem('moon_user');
-     
+      sessionStorage.removeItem('moon_user');
       window.dispatchEvent(new Event('session-expired'));
     }
     return Promise.reject(error);
@@ -55,8 +53,7 @@ export const fileApi = {
     const formData = new FormData();
     formData.append('file', file);
 
-  
-    const userStr = localStorage.getItem('moon_user');
+    const userStr = sessionStorage.getItem('moon_user');
     const token = userStr ? JSON.parse(userStr).sessionToken : '';
 
     const response = await fetch('http://localhost:5001/api/file/upload', {
@@ -69,7 +66,7 @@ export const fileApi = {
 
     if (!response.ok) {
       if (response.status === 401) {
-        localStorage.removeItem('moon_user');
+        sessionStorage.removeItem('moon_user');
         window.dispatchEvent(new Event('session-expired'));
       }
       throw new Error('Upload failed');
