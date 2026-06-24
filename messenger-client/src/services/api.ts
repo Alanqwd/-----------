@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { StickerPack } from '../types';
 
 const api = axios.create({
   baseURL: 'http://localhost:5001/api',
@@ -48,6 +49,17 @@ export const chatApi = {
   updateChatInfo: (data: any) => api.put('/chat/update', data),
 };
 
+export const stickerApi = {
+  getPacks: () => axios.get<StickerPack[]>('http://localhost:5001/api/stickers/packs'),
+  
+  createPack: (data: { name: string; coverUrl: string }) => 
+    axios.post('http://localhost:5001/api/stickers/packs', data),
+  
+  addSticker: (data: { packId: number; imageUrl: string; emoji?: string }) => 
+    axios.post('http://localhost:5001/api/stickers/stickers', data),
+  
+  uploadSticker: (file: File) => fileApi.upload(file) 
+};
 export const fileApi = {
   upload: async (file: File) => {
     const formData = new FormData();

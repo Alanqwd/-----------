@@ -20,6 +20,7 @@ export interface Message {
   imageUrl?: string;
   sentAt: string;
   senderName: string;
+  stickerUrl?: string; 
   senderAvatar?: string;
   senderId: number;
 }
@@ -30,4 +31,17 @@ export interface ChatMember {
   username: string;
   avatarUrl?: string;
   isOnline: boolean;
+}
+export interface Sticker {
+  id: number;
+  stickerPackId: number;
+  imageUrl: string;
+  emoji?: string | null;
+}
+
+export interface StickerPack {
+  id: number;
+  name: string;
+  coverUrl: string;
+  stickers: Sticker[];
 }
