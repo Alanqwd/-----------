@@ -1,12 +1,14 @@
+console.log('🔵🔵🔵 ЗАГРУЖЕН  API.TS 🔵🔵🔵');
 import axios from 'axios';
 import type { StickerPack } from '../types';
 
+
+
 const api = axios.create({
-  baseURL: 'http://localhost:5001/api',
+  baseURL: 'http://localhost:5000/api', 
 });
 
 api.interceptors.request.use((config) => {
- 
   const userStr = sessionStorage.getItem('moon_user');
   if (userStr) {
     try {
@@ -50,16 +52,14 @@ export const chatApi = {
 };
 
 export const stickerApi = {
-  getPacks: () => axios.get<StickerPack[]>('http://localhost:5001/api/stickers/packs'),
-  
+  getPacks: () => axios.get<StickerPack[]>('http://localhost:5000/api/stickers/packs'),  
   createPack: (data: { name: string; coverUrl: string }) => 
-    axios.post('http://localhost:5001/api/stickers/packs', data),
-  
+    axios.post('http://localhost:5000/api/stickers/packs', data),  
   addSticker: (data: { packId: number; imageUrl: string; emoji?: string }) => 
-    axios.post('http://localhost:5001/api/stickers/stickers', data),
-  
+    axios.post('http://localhost:5000/api/stickers/stickers', data),  
   uploadSticker: (file: File) => fileApi.upload(file) 
 };
+
 export const fileApi = {
   upload: async (file: File) => {
     const formData = new FormData();
@@ -68,7 +68,7 @@ export const fileApi = {
     const userStr = sessionStorage.getItem('moon_user');
     const token = userStr ? JSON.parse(userStr).sessionToken : '';
 
-    const response = await fetch('http://localhost:5001/api/file/upload', {
+    const response = await fetch('http://localhost:5000/api/file/upload', {  
       method: 'POST',
       body: formData,
       headers: {

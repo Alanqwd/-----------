@@ -1,12 +1,35 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { authApi, chatApi, fileApi } from './services/api';
 import type { User, ChatRoom, Message, ChatMember, StickerPack } from './types';
-import { HubConnectionBuilder, HttpTransportType, HubConnectionState } from '@microsoft/signalr';
+import { HubConnectionBuilder, HttpTransportType, HubConnectionState, HubConnection } from '@microsoft/signalr';
 import './App.css';
 
-// ============================================
-// 🎨 ВСТРОЕННЫЕ СТИКЕРЫ (хардкод, без БД)
-// ============================================
+
+interface SignalRMessageDto {
+  id: number;
+  chatRoomId: number;
+  senderId: number;
+  senderName: string;
+  senderAvatar?: string;
+  content: string;
+  imageUrl?: string;
+  stickerUrl?: string;
+  sentAt: string;
+}
+
+interface JoinChatResponse {
+  success: boolean;
+  message: string;
+  messages: SignalRMessageDto[];
+}
+
+interface SendMessageResponse {
+  success: boolean;
+  message: string;
+  messageId?: number;
+}
+
+
 const DEFAULT_STICKER_PACKS: StickerPack[] = [
   {
     id: 1,
@@ -58,7 +81,8 @@ const FALLBACK_MEMBER_AVATAR = 'https://avatars.mds.yandex.net/i?id=de30cef3f8f5
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [view, setView] = useState<'login' | 'register' | 'dashboard'>('login');
-  const [connection, setConnection] = useState<any>(null);
+const [connection, setConnection] = useState<HubConnection | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting' | 'disconnected'>('disconnected');
 
   const [chats, setChats] = useState<ChatRoom[]>([]);
   const [activeChat, setActiveChat] = useState<ChatRoom | null>(null);
@@ -71,12 +95,11 @@ const App: React.FC = () => {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showChatInfoModal, setShowChatInfoModal] = useState(false);
 
-  // 🎨 Стикеры
+
   const [showStickerPanel, setShowStickerPanel] = useState(false);
   const [stickerPacks] = useState<StickerPack[]>(DEFAULT_STICKER_PACKS);
   const [activePackId, setActivePackId] = useState<number>(DEFAULT_STICKER_PACKS[0]?.id || 1);
 
-  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting' | 'disconnected'>('disconnected');
   const [chatMembers, setChatMembers] = useState<ChatMember[]>([]);
   const [chatAvatarFile, setChatAvatarFile] = useState<File | null>(null);
 
@@ -89,12 +112,14 @@ const App: React.FC = () => {
   const userRef = useRef<User | null>(null);
   const stickerPanelRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+ const connectionRef = useRef<HubConnection | null>(null);
 
   useEffect(() => { activeChatRef.current = activeChat; }, [activeChat]);
   useEffect(() => { userRef.current = user; }, [user]);
+  useEffect(() => { connectionRef.current = connection; }, [connection]);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-  // Закрытие панели стикеров при клике вне
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (stickerPanelRef.current && !stickerPanelRef.current.contains(e.target as Node)) {
@@ -105,22 +130,15 @@ const App: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showStickerPanel]);
 
-  // Восстановление сессии
+  
   useEffect(() => {
     const savedUser = sessionStorage.getItem('moon_user');
     if (savedUser) {
       try {
         const parsedUser = JSON.parse(savedUser);
         if (parsedUser.sessionToken) {
-          chatApi.getMyChats(parsedUser.userId)
-            .then(() => { setUser(parsedUser); setView('dashboard'); })
-            .catch(() => {
-              sessionStorage.removeItem('moon_user');
-              setUser(null); setView('login');
-            });
-        } else {
-          sessionStorage.removeItem('moon_user');
-          setView('login');
+          setUser(parsedUser);
+          setView('dashboard');
         }
       } catch {
         sessionStorage.removeItem('moon_user');
@@ -129,259 +147,281 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Обработчик истечения сессии
+
   useEffect(() => {
     const handleSessionExpired = () => {
       setUser(null); setView('login');
       sessionStorage.removeItem('moon_user');
-      alert('Ваша сессия истекла. Возможно, вы вошли с другого устройства.');
     };
     window.addEventListener('session-expired', handleSessionExpired);
     return () => window.removeEventListener('session-expired', handleSessionExpired);
   }, []);
 
-  // SignalR
+
   useEffect(() => {
-    if (!user) return;
-    loadChats();
+  
 
     const newConnection = new HubConnectionBuilder()
-      .withUrl('http://localhost:5001/chathub', {
+      .withUrl('http://localhost:5000/chathub', {
         skipNegotiation: true,
         transport: HttpTransportType.WebSockets
       })
-      .withAutomaticReconnect()
+      .withAutomaticReconnect([0, 1500, 3000, 5000, 8000])
       .build();
 
-    newConnection.onreconnected(async () => {
-      setConnectionStatus('connected');
-      try {
-        if (newConnection.state === HubConnectionState.Connected && userRef.current) {
-          await newConnection.invoke('UserConnected', userRef.current.userId, userRef.current.sessionToken);
-        }
-      } catch (err) { console.error("Error re-notifying:", err); }
-      if (activeChatRef.current && userRef.current) {
-        try {
-          if (newConnection.state === HubConnectionState.Connected) {
-            await newConnection.invoke('JoinChat', activeChatRef.current.id, userRef.current.userId);
-          }
-        } catch (err) { console.error("Ошибка при повторном входе:", err); }
-      }
-      loadChats();
-    });
 
-    newConnection.onreconnecting(() => setConnectionStatus('reconnecting'));
-    newConnection.onclose(() => setConnectionStatus('disconnected'));
-
-    // ✅ ИСПРАВЛЕННЫЙ ОБРАБОТЧИК СООБЩЕНИЙ
-    newConnection.on('ReceiveMessage', (msg: any) => {
-      console.log("Получено сообщение:", msg);
-
-      // Определяем ID чата (бэкенд может прислать как ChatRoomId или chatRoomId)
-      const chatRoomId = msg.ChatRoomId ?? msg.chatRoomId;
-
+    newConnection.on('ReceiveMessage', (msg: SignalRMessageDto) => {
       setMessages(prev => {
-        const isSticker = msg.content === '[STICKER]' && !!msg.imageUrl;
-
-        if (isSticker) {
-          const existingIndex = prev.findIndex(m =>
-            m.content === '[STICKER]' &&
-            m.imageUrl === msg.imageUrl &&
-            m.senderId === msg.senderId
-          );
-
-          if (existingIndex !== -1) {
-            const updated = [...prev];
-            updated[existingIndex] = msg;
-            return updated;
-          }
-        } else {
-          const existingIndex = prev.findIndex(m =>
-            m.id < 1000000000000 &&
-            m.content === msg.content &&
-            m.senderId === msg.senderId &&
-            !m.imageUrl
-          );
-
-          if (existingIndex !== -1) {
-            const updated = [...prev];
-            updated[existingIndex] = msg;
-            return updated;
-          }
+       
+        const tempIndex = prev.findIndex(m => m.id < 0 && m.senderId === msg.senderId && m.content === msg.content);
+        if (tempIndex !== -1) {
+          const updated = [...prev];
+          updated[tempIndex] = { ...msg, stickerUrl: msg.stickerUrl } as Message;
+          return updated;
         }
-
-        if (prev.some(m => m.id === msg.id)) {
-          return prev;
-        }
-
-        return [...prev, msg];
+        
+        if (prev.some(m => m.id === msg.id)) return prev;
+        return [...prev, msg as Message];
       });
-
-      // ✅ СЧЕТЧИК НЕПРОЧИТАННЫХ
-      // Увеличиваем ТОЛЬКО если:
-      // 1. Сообщение не от текущего пользователя
-      // 2. Чат НЕ активен (не открыт сейчас)
-      if (msg.senderId !== userRef.current?.userId) {
-        const isActiveChatOpen = activeChatRef.current?.id === chatRoomId;
-
-        if (!isActiveChatOpen) {
-          console.log(`🔔 Увеличиваем счетчик для чата ${chatRoomId}`);
-          setChats(prev => prev.map(c =>
-            c.id === chatRoomId ? { ...c, unreadCount: (c.unreadCount || 0) + 1 } : c
-          ));
-        } else {
-          console.log(`👁 Сообщение в активном чате ${chatRoomId} — счетчик не увеличиваем`);
-        }
-      }
-    });
-
-    newConnection.on('UpdateUnreadBadge', (chatId: number) => {
-      setChats(prev => prev.map(c => c.id === chatId ? { ...c, unreadCount: (c.unreadCount || 0) + 1 } : c));
-    });
-
-    newConnection.on('UnreadCountsUpdated', () => loadChats());
-
+   }); 
+    
     newConnection.on('UserStatusChanged', (userId: number, isOnline: boolean) => {
       setChatMembers(prev => prev.map(m => m.userId === userId ? { ...m, isOnline } : m));
     });
 
-    newConnection.on('UserJoinedChat', (_userId: number, username: string) => {
-      setMessages(prev => [...prev, {
-        id: Date.now() + Math.random(),
-        content: `${username} присоединился к чату`,
-        sentAt: new Date().toISOString(),
-        senderId: 0, senderName: 'Система', senderAvatar: null, isSystemMessage: true
-      } as any]);
+    newConnection.on('UserJoinedChat', (_: number, username: string) => {
+      addSystemMessage(`${username} присоединился к чату`);
     });
 
-    newConnection.on('UserLeftChat', (_userId: number, username: string) => {
-      setMessages(prev => [...prev, {
-        id: Date.now() + Math.random(),
-        content: `${username} покинул чат`,
-        sentAt: new Date().toISOString(),
-        senderId: 0, senderName: 'Система', senderAvatar: null, isSystemMessage: true
-      } as any]);
+    newConnection.on('UserLeftChat', (_: number, username: string) => {
+      addSystemMessage(`${username} покинул чат`);
     });
+
+    newConnection.onreconnecting(() => setConnectionStatus('reconnecting'));
+    
+    newConnection.onreconnected(async () => {
+      setConnectionStatus('connected');
+      const currentUser = userRef.current;
+      if (currentUser && newConnection.state === HubConnectionState.Connected) {
+  
+        await newConnection.invoke('UserConnected', currentUser.userId, currentUser.sessionToken);
+        
+        
+        const active = activeChatRef.current;
+        if (active) {
+          await newConnection.invoke('JoinChat', active.id, currentUser.userId);
+        }
+      }
+      loadChats();
+    });
+
+    newConnection.onclose(() => setConnectionStatus('disconnected'));
+
+    setConnection(newConnection);
+    connectionRef.current = newConnection;
 
     newConnection.start()
       .then(async () => {
         setConnectionStatus('connected');
-        setConnection(newConnection);
-        if (newConnection.state === HubConnectionState.Connected && user) {
-          try {
-            await newConnection.invoke('UserConnected', user.userId, user.sessionToken);
-          } catch (err) {
-            const error = err as any;
-            if (error.message?.includes("Invalid or expired session")) {
-              handleSessionExpiredLogic();
-            }
-          }
+        if (user && newConnection.state === HubConnectionState.Connected) {
+          await newConnection.invoke('UserConnected', user.userId, user.sessionToken);
+          loadChats();
         }
       })
       .catch(err => {
-        if (err instanceof Error && err.name === 'AbortError') return;
-        console.error("SignalR Error:", err);
-        setConnectionStatus('disconnected');
+        if (err.name !== 'AbortError') console.error('SignalR start error:', err);
       });
 
     return () => {
-      if (newConnection.state === HubConnectionState.Connected ||
-        newConnection.state === HubConnectionState.Connecting) {
-        newConnection.stop().catch(() => { });
-      }
+      if (newConnection.state === HubConnectionState.Connected) newConnection.stop();
     };
+
   }, [user]);
 
-  const handleSessionExpiredLogic = () => {
-    setUser(null); setView('login');
-    sessionStorage.removeItem('moon_user');
-    alert('Ваша сессия истекла.');
+  const addSystemMessage = (content: string) => {
+    setMessages(prev => [...prev, {
+      id: Date.now() + Math.random(), 
+      content, 
+      sentAt: new Date().toISOString(),
+      senderId: 0, 
+      senderName: 'Система', 
+      senderAvatar: null
+    } as any]);
   };
 
-  useEffect(() => {
-    if (!connection || !activeChat || !user) return;
-    if (connection.state !== HubConnectionState.Connected) return;
-    const joinChat = async () => {
-      try {
-        await connection.invoke('JoinChat', activeChat.id, user.userId);
-        loadChatMembers(activeChat.id);
-      } catch (error) { console.error("[JoinChat] Ошибка:", error); }
-    };
-    joinChat();
-  }, [activeChat, connection, user]);
-
   const loadChats = async () => {
-    if (user) {
-      try {
-        const res = await chatApi.getMyChats(user.userId);
-        setChats(res.data);
-      } catch (e) { console.error(e); }
-    }
+    if (!user) return;
+    try {
+      const res = await chatApi.getMyChats(user.userId);
+      setChats(res.data);
+    } catch (e) { console.error(e); }
   };
 
   const loadChatMembers = async (chatId: number) => {
     try {
       const res = await chatApi.getChatMembers(chatId);
       let members: ChatMember[] = res.data;
-      if (connection && connection.state === HubConnectionState.Connected) {
+      
+    
+      if (connectionRef.current?.state === HubConnectionState.Connected) {
         try {
-          const onlineUserIds: number[] = await connection.invoke('GetOnlineUsersInChat', chatId);
-          members = members.map((m: ChatMember) => ({ ...m, isOnline: onlineUserIds.includes(m.userId) }));
+          const onlineIds: number[] = await connectionRef.current.invoke('GetOnlineUsersInChat', chatId);
+          members = members.map(m => ({ ...m, isOnline: onlineIds.includes(m.userId) }));
         } catch (err) { console.error("Error getting online users:", err); }
       }
       setChatMembers(members);
     } catch (e) { console.error("Ошибка загрузки участников:", e); }
   };
 
+  const selectChat = useCallback(async (chat: ChatRoom) => {
+    if (!connectionRef.current || !userRef.current) return;
+
+  
+    if (activeChatRef.current) {
+      await connectionRef.current.invoke('LeaveChatFromHub', activeChatRef.current.id, userRef.current.userId);
+    }
+
+    setActiveChat(chat);
+    setMessages([]); 
+    setShowStickerPanel(false);
+
+    try {
+
+      const response = await connectionRef.current.invoke<JoinChatResponse>('JoinChat', chat.id, userRef.current.userId);
+      
+      if (response && response.success && response.messages) {
+        setMessages(response.messages);
+      }
+      
+      loadChatMembers(chat.id);
+    } catch (err) {
+      console.error('JoinChat failed:', err);
+    }
+  }, []);
+
+  const sendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!connectionRef.current || !activeChatRef.current || !userRef.current || (!newMessage.trim() && !imageFile)) return;
+
+    let imageUrl: string | undefined;
+    if (imageFile) {
+      try {
+        const res = await fileApi.upload(imageFile);
+        imageUrl = res.url;
+      } catch { alert('Ошибка загрузки файла'); return; }
+    }
+
+
+    const tempId = -Date.now();
+    const tempMsg: Message = {
+      id: tempId, 
+      content: newMessage.trim(), 
+      imageUrl, 
+      sentAt: new Date().toISOString(),
+      senderName: userRef.current.username, 
+      senderAvatar: userRef.current.avatarUrl, 
+      senderId: userRef.current.userId
+    };
+
+    setMessages(prev => [...prev, tempMsg]);
+    setNewMessage(''); 
+    setImageFile(null);
+
+    try {
+   
+      await connectionRef.current.invoke<SendMessageResponse>(
+        'SendMessage', 
+        activeChatRef.current.id, 
+        userRef.current.userId, 
+        tempMsg.content, 
+        imageUrl, 
+        null 
+      );
+    } catch {
+      
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+      alert('Не удалось отправить сообщение');
+    }
+  };
+
+  const sendSticker = async (stickerUrl: string) => {
+    if (!connectionRef.current || !activeChatRef.current || !userRef.current) return;
+
+    const tempId = -Date.now() - 1;
+    const tempMsg: Message = {
+      id: tempId, 
+      content: '', 
+      stickerUrl, 
+      sentAt: new Date().toISOString(),
+      senderName: userRef.current.username, 
+      senderAvatar: userRef.current.avatarUrl, 
+      senderId: userRef.current.userId
+    };
+
+    setMessages(prev => [...prev, tempMsg]);
+    setShowStickerPanel(false);
+
+    try {
+      await connectionRef.current.invoke<SendMessageResponse>(
+        'SendMessage', 
+        activeChatRef.current.id, 
+        userRef.current.userId, 
+        '', 
+        null, 
+        stickerUrl 
+      );
+    } catch {
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+      alert('Не удалось отправить стикер');
+    }
+  };
+
+  const handleLeaveChat = async () => {
+    if (!activeChat || !user) return;
+    if (!confirm('Выйти из чата?')) return;
+    
+    if (connection?.state === HubConnectionState.Connected) {
+      await connection.invoke('LeaveChatFromHub', activeChat.id, user.userId);
+    }
+    try {
+      await chatApi.leaveChat({ chatId: activeChat.id, userId: user.userId });
+      setActiveChat(null); 
+      setMessages([]); 
+      loadChats(); 
+      setShowChatInfoModal(false);
+    } catch { alert('Ошибка выхода'); }
+  };
+
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const res = await authApi.login({ username: formData.username, password: formData.password });
-      const userData = { ...res.data, sessionToken: res.data.sessionToken };
-      setUser(userData);
-      sessionStorage.setItem('moon_user', JSON.stringify(userData));
-      setView('dashboard');
-    } catch (err) {
-      const error = err as any;
-      alert(error.response?.data || error.message || 'Login failed');
-    }
+      const u = { ...res.data, sessionToken: res.data.sessionToken };
+      setUser(u); sessionStorage.setItem('moon_user', JSON.stringify(u)); setView('dashboard');
+    } catch (err: any) { alert(err.response?.data || 'Ошибка входа'); }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      sessionStorage.removeItem('moon_user');
-      setUser(null);
-      const res = await authApi.register({
-        username: formData.username, password: formData.password,
-        bio: formData.bio, avatarUrl: formData.avatarUrl
-      });
-      const userData = { ...res.data, sessionToken: res.data.sessionToken };
-      setUser(userData);
-      sessionStorage.setItem('moon_user', JSON.stringify(userData));
-      setView('dashboard');
-    } catch { alert('Registration failed'); }
+      const res = await authApi.register({ username: formData.username, password: formData.password, bio: formData.bio, avatarUrl: formData.avatarUrl });
+      const u = { ...res.data, sessionToken: res.data.sessionToken };
+      setUser(u); sessionStorage.setItem('moon_user', JSON.stringify(u)); setView('dashboard');
+    } catch { alert('Ошибка регистрации'); }
   };
 
   const handleCreateChat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     let avatarUrl = null;
-    if (chatAvatarFile) {
-      try {
-        const result = await fileApi.upload(chatAvatarFile);
-        avatarUrl = result.url;
-      } catch (error) { console.error("Ошибка загрузки аватара:", error); }
-    }
+    if (chatAvatarFile) { try { const r = await fileApi.upload(chatAvatarFile); avatarUrl = r.url; } catch {} }
     try {
-      await chatApi.createChat({
-        accessCode: formData.accessCode, name: formData.chatName, userId: user.userId,
-        avatarUrl: avatarUrl || FALLBACK_CHAT_AVATAR, description: formData.description
-      });
+      await chatApi.createChat({ accessCode: formData.accessCode, name: formData.chatName, userId: user.userId, avatarUrl: avatarUrl || FALLBACK_CHAT_AVATAR, description: formData.description });
       setShowCreateModal(false); loadChats();
       setFormData({ ...formData, accessCode: '', chatName: '', description: '' });
       setChatAvatarFile(null);
-    } catch { alert('Failed to create chat.'); }
+    } catch { alert('Ошибка создания чата'); }
   };
 
   const handleJoinChat = async (e: React.FormEvent) => {
@@ -391,136 +431,29 @@ const App: React.FC = () => {
       await chatApi.joinChat({ accessCode: formData.accessCode, userId: user.userId });
       setShowJoinModal(false); loadChats();
       setFormData({ ...formData, accessCode: '' });
-    } catch { alert('Chat not found'); }
-  };
-
-  const selectChat = async (chat: ChatRoom) => {
-    if (activeChat && activeChat.id !== chat.id && user) await leaveChatHub();
-    setChats(prev => prev.map(c => c.id === chat.id ? { ...c, unreadCount: 0 } : c));
-    setActiveChat(chat);
-    setShowStickerPanel(false);
-    try {
-      const res = await chatApi.getMessages(chat.id);
-      setMessages(res.data);
-      if (connection && connection.state === HubConnectionState.Connected && user) {
-        await connection.invoke('JoinChat', chat.id, user.userId);
-      }
-      await fetch(`http://localhost:5001/api/chat/mark-as-read`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${user?.sessionToken}` },
-        body: JSON.stringify({ chatId: chat.id, userId: user?.userId })
-      });
-    } catch (e) { console.error("Ошибка загрузки сообщений:", e); }
-  };
-
-  const leaveChatHub = async () => {
-    if (connection && connection.state === HubConnectionState.Connected && activeChat && user) {
-      try { await connection.invoke('LeaveChatFromHub', activeChat.id, user.userId); } catch { }
-    }
-  };
-
-  const sendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!connection || !activeChat || !user || (!newMessage && !imageFile)) return;
-
-    let imageUrl = null;
-    if (imageFile) {
-      try {
-        const result = await fileApi.upload(imageFile);
-        imageUrl = result.url;
-      } catch { alert("Не удалось загрузить файл"); return; }
-    }
-
-    const tempId = Date.now();
-    const tempMessage: Message = {
-      id: tempId,
-      content: newMessage,
-      imageUrl: imageUrl || undefined,
-      sentAt: new Date().toISOString(),
-      senderName: user.username,
-      senderAvatar: user.avatarUrl,
-      senderId: user.userId
-    };
-
-    setMessages(prev => [...prev, tempMessage]);
-    setNewMessage('');
-    setImageFile(null);
-
-    try {
-      if (connection.state !== HubConnectionState.Connected) throw new Error("Не подключено");
-      await connection.invoke('SendMessage', activeChat.id, user.userId, newMessage, imageUrl);
-    } catch {
-      alert("Не удалось отправить сообщение");
-      setMessages(prev => prev.filter(m => m.id !== tempId));
-    }
-  };
-
-  const sendSticker = async (stickerUrl: string) => {
-    if (!connection || !activeChat || !user) return;
-    if (connection.state !== HubConnectionState.Connected) {
-      alert("Нет соединения");
-      return;
-    }
-
-    const tempId = Date.now() + Math.random();
-    const tempMsg: Message = {
-      id: tempId,
-      content: '[STICKER]',
-      imageUrl: stickerUrl,
-      sentAt: new Date().toISOString(),
-      senderId: user.userId,
-      senderName: user.username,
-      senderAvatar: user.avatarUrl,
-    };
-
-    setMessages(prev => [...prev, tempMsg]);
-    setShowStickerPanel(false);
-
-    try {
-      await connection.invoke('SendMessage', activeChat.id, user.userId, '[STICKER]', stickerUrl);
-    } catch (error) {
-      console.error("Ошибка отправки стикера:", error);
-      alert("Не удалось отправить стикер");
-      setMessages(prev => prev.filter(m => m.id !== tempId));
-    }
-  };
-
-  const isStickerMessage = (msg: Message): boolean => {
-    return msg.content === '[STICKER]' && !!msg.imageUrl;
-  };
-
-  const handleLeaveChat = async () => {
-    if (!activeChat || !user) return;
-    if (!confirm('Выйти из чата?')) return;
-    await leaveChatHub();
-    try {
-      await chatApi.leaveChat({ chatId: activeChat.id, userId: user.userId });
-      setActiveChat(null); setMessages([]); loadChats(); setShowChatInfoModal(false);
-    } catch { alert("Не удалось выйти из чата"); }
+    } catch { alert('Чат не найден'); }
   };
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
+    e.preventDefault(); if (!user) return;
     try {
-      await authApi.updateProfile({
-        userId: user.userId, username: formData.username,
-        bio: formData.bio, avatarUrl: formData.avatarUrl
-      });
+      await authApi.updateProfile({ userId: user.userId, username: formData.username, bio: formData.bio, avatarUrl: formData.avatarUrl });
       setUser({ ...user, username: formData.username, bio: formData.bio, avatarUrl: formData.avatarUrl });
       setShowProfileModal(false);
-    } catch { alert('Update failed'); }
+    } catch { alert('Ошибка обновления'); }
   };
 
   const handleLogout = () => {
-    if (activeChat && user) leaveChatHub();
-    setUser(null); setView('login');
-    sessionStorage.removeItem('moon_user');
-    if (connection) { connection.stop(); setConnection(null); }
+    if (activeChat && user && connection?.state === HubConnectionState.Connected) {
+      connection.invoke('LeaveChatFromHub', activeChat.id, user.userId);
+    }
+    setUser(null); setView('login'); sessionStorage.removeItem('moon_user');
+    if (connection) connection.stop();
   };
 
   const activePack = stickerPacks.find(p => p.id === activePackId);
 
+  
   if (view === 'login') {
     return (
       <div className="space-container">
@@ -580,18 +513,17 @@ const App: React.FC = () => {
           <button onClick={() => setShowCreateModal(true)}>+ Создать чат</button>
           <button onClick={() => setShowJoinModal(true)}>Присоединиться к чату</button>
         </div>
-
-        <div className="chat-list">
-          {chats.map(chat => (
-            <div key={chat.id} className={`chat-item ${activeChat?.id === chat.id ? 'active' : ''}`} onClick={() => selectChat(chat)}>
-              <img src={chat.avatarUrl || FALLBACK_CHAT_AVATAR} alt={chat.name} className="chat-avatar"
-                onError={(e) => { e.currentTarget.src = FALLBACK_CHAT_AVATAR; }} />
-              <div className="chat-name">{chat.name}</div>
-              {chat.unreadCount > 0 && <div className="badge">{chat.unreadCount}</div>}
-            </div>
-          ))}
-        </div>
       </aside>
+
+<div className="chat-list">
+  {chats.map(chat => (
+    <div key={chat.id} className={`chat-item ${activeChat?.id === chat.id ? 'active' : ''}`} onClick={() => selectChat(chat)}>
+      <img src={chat.avatarUrl || FALLBACK_CHAT_AVATAR} alt={chat.name} className="chat-avatar"
+        onError={(e) => { e.currentTarget.src = FALLBACK_CHAT_AVATAR; }} />
+      <div className="chat-name">{chat.name}</div>
+    </div>
+  ))}
+</div>
 
       <main className="chat-area">
         {activeChat ? (
@@ -613,13 +545,13 @@ const App: React.FC = () => {
 
             <div className="messages-list">
               {messages.map(msg => {
-                const isSystem = (msg as any).isSystemMessage === true;
-                const isSticker = isStickerMessage(msg);
+                const isSystem = (msg as any).isSystemMessage === true || msg.senderId === 0;
+                const isSticker = !!msg.stickerUrl;
 
                 if (isSticker) {
                   return (
                     <div key={msg.id} className={`message sticker-message ${msg.senderId === user?.userId ? 'own' : 'other'}`}>
-                      <img src={msg.imageUrl} alt="sticker" className="sticker-image"
+                      <img src={msg.stickerUrl} alt="sticker" className="sticker-image"
                         onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                       <span className="sticker-sender">
                         {msg.senderId === user?.userId ? 'Вы' : msg.senderName}
@@ -717,6 +649,7 @@ const App: React.FC = () => {
         )}
       </main>
 
+      {/* МОДАЛКИ (Вернул оригинальные) */}
       {showCreateModal && (
         <div className="modal-overlay">
           <div className="modal">
