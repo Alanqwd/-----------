@@ -76,7 +76,6 @@ const DEFAULT_STICKER_PACKS: StickerPack[] = [
 
 const FALLBACK_AVATAR = 'https://svgsilh.com/svg/2426371.svg';
 const FALLBACK_CHAT_AVATAR = 'https://i.pinimg.com/736x/39/41/2a/39412a88ee11e656dbf45099958ea76d.jpg';
-const FALLBACK_MEMBER_AVATAR = 'https://avatars.mds.yandex.net/i?id=de30cef3f8f5e4653bedb0e4e4b08286_l-4518571-images-thumbs&n=13';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -88,7 +87,6 @@ const [connection, setConnection] = useState<HubConnection | null>(null);
   const [activeChat, setActiveChat] = useState<ChatRoom | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [imageFile, setImageFile] = useState<File | null>(null);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -299,100 +297,64 @@ const [connection, setConnection] = useState<HubConnection | null>(null);
     }
   }, []);
 
-  const sendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!connectionRef.current || !activeChatRef.current || !userRef.current || (!newMessage.trim() && !imageFile)) return;
+ const sendMessage = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!connectionRef.current || !activeChatRef.current || !userRef.current || !newMessage.trim()) return;
 
-    let imageUrl: string | undefined;
-    if (imageFile) {
-      try {
-        const res = await fileApi.upload(imageFile);
-        imageUrl = res.url;
-      } catch { alert('Ошибка загрузки файла'); return; }
-    }
-
-
-    const tempId = -Date.now();
-    const tempMsg: Message = {
-      id: tempId, 
-      content: newMessage.trim(), 
-      imageUrl, 
-      sentAt: new Date().toISOString(),
-      senderName: userRef.current.username, 
-      senderAvatar: userRef.current.avatarUrl, 
-      senderId: userRef.current.userId
-    };
-
-    setMessages(prev => [...prev, tempMsg]);
-    setNewMessage(''); 
-    setImageFile(null);
-
-    try {
-   
-      await connectionRef.current.invoke<SendMessageResponse>(
-        'SendMessage', 
-        activeChatRef.current.id, 
-        userRef.current.userId, 
-        tempMsg.content, 
-        imageUrl, 
-        null 
-      );
-    } catch {
-      
-      setMessages(prev => prev.filter(m => m.id !== tempId));
-      alert('Не удалось отправить сообщение');
-    }
+  const tempId = -Date.now();
+  const tempMsg: Message = {
+    id: tempId, 
+    content: newMessage.trim(), 
+    sentAt: new Date().toISOString(),
+    senderName: userRef.current.username, 
+    senderAvatar: userRef.current.avatarUrl, 
+    senderId: userRef.current.userId
   };
 
-  const sendSticker = async (stickerUrl: string) => {
-    if (!connectionRef.current || !activeChatRef.current || !userRef.current) return;
+  setMessages(prev => [...prev, tempMsg]);
+  setNewMessage(''); 
 
-    const tempId = -Date.now() - 1;
-    const tempMsg: Message = {
-      id: tempId, 
-      content: '', 
-      stickerUrl, 
-      sentAt: new Date().toISOString(),
-      senderName: userRef.current.username, 
-      senderAvatar: userRef.current.avatarUrl, 
-      senderId: userRef.current.userId
-    };
+  try {
+    await connectionRef.current.invoke<SendMessageResponse>(
+      'SendMessage', 
+      activeChatRef.current.id, 
+      userRef.current.userId, 
+      tempMsg.content, 
+      '',  
+      ''  
+    );
+  } catch {
+    setMessages(prev => prev.filter(m => m.id !== tempId));
+    alert('Не удалось отправить сообщение');
+  }
+};
+const handleLeaveChat = async () => {
+  if (!activeChat || !user) return;
+  
+  if (!confirm('Выйти из чата?')) return;
+  
 
-    setMessages(prev => [...prev, tempMsg]);
-    setShowStickerPanel(false);
+  if (connection?.state === HubConnectionState.Connected) {
+    await connection.invoke('LeaveChatFromHub', activeChat.id, user.userId);
+  }
+  
+  try {
 
-    try {
-      await connectionRef.current.invoke<SendMessageResponse>(
-        'SendMessage', 
-        activeChatRef.current.id, 
-        userRef.current.userId, 
-        '', 
-        null, 
-        stickerUrl 
-      );
-    } catch {
-      setMessages(prev => prev.filter(m => m.id !== tempId));
-      alert('Не удалось отправить стикер');
-    }
-  };
-
-  const handleLeaveChat = async () => {
-    if (!activeChat || !user) return;
-    if (!confirm('Выйти из чата?')) return;
+    await chatApi.leaveChat({ chatId: activeChat.id, userId: user.userId });
     
-    if (connection?.state === HubConnectionState.Connected) {
-      await connection.invoke('LeaveChatFromHub', activeChat.id, user.userId);
-    }
-    try {
-      await chatApi.leaveChat({ chatId: activeChat.id, userId: user.userId });
-      setActiveChat(null); 
-      setMessages([]); 
-      loadChats(); 
-      setShowChatInfoModal(false);
-    } catch { alert('Ошибка выхода'); }
-  };
 
+    setActiveChat(null); 
+    setMessages([]); 
 
+    loadChats(); 
+    
+   
+    setShowChatInfoModal(false);
+  } catch (err: any) {
+    console.error('[handleLeaveChat] Ошибка:', err);
+    alert(`Ошибка выхода из чата: ${err.response?.data || 'Не удалось выйти'}`);
+  }
+};
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -481,7 +443,7 @@ const [connection, setConnection] = useState<HubConnection | null>(null);
             <input placeholder="Имя пользователя" onChange={e => setFormData({ ...formData, username: e.target.value })} />
             <input type="password" placeholder="Пароль" onChange={e => setFormData({ ...formData, password: e.target.value })} />
             <input placeholder="Описание" onChange={e => setFormData({ ...formData, bio: e.target.value })} />
-            <input placeholder="Ссылка для аватарки" onChange={e => setFormData({ ...formData, avatarUrl: e.target.value })} />
+            <input placeholder="Ссылка для аватарку" onChange={e => setFormData({ ...formData, avatarUrl: e.target.value })} />
             <button type="submit">Зарегистрироваться</button>
           </form>
           <p onClick={() => setView('login')}>Есть аккаунт? Войти</p>
@@ -490,178 +452,204 @@ const [connection, setConnection] = useState<HubConnection | null>(null);
     );
   }
 
+ const sendSticker = async (stickerUrl: string) => {
+
+  if (!connectionRef.current || !activeChatRef.current || !userRef.current) {
+    console.error('[sendSticker] Нет подключения, чата или пользователя');
+    return;
+  }
+
+  if (connectionRef.current.state !== HubConnectionState.Connected) {
+    alert('Нет подключения к серверу');
+    return;
+  }
+
+  const tempId = -Date.now() - 1;
+  const tempMsg: Message = {
+    id: tempId,
+    content: '',
+    stickerUrl,
+    sentAt: new Date().toISOString(),
+    senderName: userRef.current.username,
+    senderAvatar: userRef.current.avatarUrl || '',
+    senderId: userRef.current.userId
+  };
+
+  setMessages(prev => [...prev, tempMsg]);
+  setShowStickerPanel(false);
+
+  try {
+
+    await connectionRef.current.invoke<SendMessageResponse>(
+      'SendMessage',
+      activeChatRef.current.id,
+      userRef.current.userId,
+      '',          
+      '',           
+      stickerUrl    
+    );
+  } catch (err) {
+    console.error('[sendSticker] Ошибка отправки:', err);
+    setMessages(prev => prev.filter(m => m.id !== tempId));
+    alert('Не удалось отправить стикер');
+  }
+};
+
   return (
-    <div className="app-container">
-      <aside className="sidebar">
-        <div className="sidebar-header">
-          <h1 className="logo-small">MOON</h1>
-          <div className="user-info" onClick={() => {
-            setFormData({
-              username: user?.username || '', password: '', accessCode: '', chatName: '',
-              bio: user?.bio || '', avatarUrl: user?.avatarUrl || '', description: ''
-            });
-            setShowProfileModal(true);
-          }}>
-            <img src={user?.avatarUrl || FALLBACK_AVATAR} alt="avatar" className="avatar-small"
-              onError={(e) => { e.currentTarget.src = FALLBACK_AVATAR; }} />
-            <span>{user?.username}</span>
+  <div className="app-container">
+    <aside className="sidebar">
+      <div className="sidebar-header">
+        <h1 className="logo-small">MOON</h1>
+        <div className="user-info" onClick={() => {
+          setFormData({
+            username: user?.username || '', password: '', accessCode: '', chatName: '',
+            bio: user?.bio || '', avatarUrl: user?.avatarUrl || '', description: ''
+          });
+          setShowProfileModal(true);
+        }}>
+          <img src={user?.avatarUrl || FALLBACK_AVATAR} alt="avatar" className="avatar-small"
+            onError={(e) => { e.currentTarget.src = FALLBACK_AVATAR; }} />
+          <span>{user?.username}</span>
+        </div>
+        <button onClick={handleLogout} className="logout-btn">Выйти</button>
+      </div>
+
+      <div className="chat-actions">
+        <button onClick={() => setShowCreateModal(true)}>+ Создать чат</button>
+        <button onClick={() => setShowJoinModal(true)}>Присоединиться к чату</button>
+      </div>
+
+      <div className="chat-list">
+        {chats.map(chat => (
+          <div key={chat.id} className={`chat-item ${activeChat?.id === chat.id ? 'active' : ''}`} onClick={() => selectChat(chat)}>
+            <img src={chat.avatarUrl || FALLBACK_CHAT_AVATAR} alt={chat.name} className="chat-avatar"
+              onError={(e) => { e.currentTarget.src = FALLBACK_CHAT_AVATAR; }} />
+            <div className="chat-name">{chat.name}</div>
           </div>
-          <button onClick={handleLogout} className="logout-btn">Выйти</button>
-        </div>
+        ))}
+      </div>
+    </aside>
 
-        <div className="chat-actions">
-          <button onClick={() => setShowCreateModal(true)}>+ Создать чат</button>
-          <button onClick={() => setShowJoinModal(true)}>Присоединиться к чату</button>
-        </div>
-      </aside>
+    <main className="chat-area">
+      {activeChat ? (
+        <>
+          <header className="chat-header">
+            <img src={activeChat.avatarUrl || FALLBACK_CHAT_AVATAR} alt={activeChat.name}
+              className="chat-header-avatar"
+              onError={(e) => { e.currentTarget.src = FALLBACK_CHAT_AVATAR; }}
+              onClick={() => { loadChatMembers(activeChat.id); setShowChatInfoModal(true); }}
+              style={{ cursor: 'pointer' }} />
+            <h2>{activeChat.name}</h2>
+            <span className="code-display">Пароль: {activeChat.accessCode}</span>
+            <span className={`connection-status ${connectionStatus}`}>
+              {connectionStatus === 'connected' && '🟢 Онлайн'}
+              {connectionStatus === 'disconnected' && '🔴 Оффлайн'}
+            </span>
+          </header>
 
-<div className="chat-list">
-  {chats.map(chat => (
-    <div key={chat.id} className={`chat-item ${activeChat?.id === chat.id ? 'active' : ''}`} onClick={() => selectChat(chat)}>
-      <img src={chat.avatarUrl || FALLBACK_CHAT_AVATAR} alt={chat.name} className="chat-avatar"
-        onError={(e) => { e.currentTarget.src = FALLBACK_CHAT_AVATAR; }} />
-      <div className="chat-name">{chat.name}</div>
-    </div>
-  ))}
-</div>
+          <div className="messages-list">
+            {messages.map(msg => {
+              const isSystem = (msg as any).isSystemMessage === true || msg.senderId === 0;
+              const isSticker = !!msg.stickerUrl;
 
-      <main className="chat-area">
-        {activeChat ? (
-          <>
-            <header className="chat-header">
-              <img src={activeChat.avatarUrl || FALLBACK_CHAT_AVATAR} alt={activeChat.name}
-                className="chat-header-avatar"
-                onError={(e) => { e.currentTarget.src = FALLBACK_CHAT_AVATAR; }}
-                onClick={() => { loadChatMembers(activeChat.id); setShowChatInfoModal(true); }}
-                style={{ cursor: 'pointer' }} />
-              <h2>{activeChat.name}</h2>
-              <span className="code-display">Пароль: {activeChat.accessCode}</span>
-              <span className={`connection-status ${connectionStatus}`}>
-                {connectionStatus === 'connected' && '🟢 Онлайн'}
-                {connectionStatus === 'reconnecting' && '🟡 Переподключение...'}
-                {connectionStatus === 'disconnected' && '🔴 Оффлайн'}
-              </span>
-            </header>
-
-            <div className="messages-list">
-              {messages.map(msg => {
-                const isSystem = (msg as any).isSystemMessage === true || msg.senderId === 0;
-                const isSticker = !!msg.stickerUrl;
-
-                if (isSticker) {
-                  return (
-                    <div key={msg.id} className={`message sticker-message ${msg.senderId === user?.userId ? 'own' : 'other'}`}>
-                      <img src={msg.stickerUrl} alt="sticker" className="sticker-image"
-                        onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                      <span className="sticker-sender">
-                        {msg.senderId === user?.userId ? 'Вы' : msg.senderName}
-                      </span>
-                    </div>
-                  );
-                }
-
-                if (isSystem) {
-                  return (
-                    <div key={msg.id} className="message system">
-                      <div className="msg-content">
-                        {msg.content && <p>{msg.content}</p>}
-                      </div>
-                    </div>
-                  );
-                }
-
+              if (isSticker) {
                 return (
-                  <div key={msg.id} className={`message ${msg.senderId === user?.userId ? 'own' : 'other'}`}>
-                    <div className="msg-meta">
-                      <img src={msg.senderAvatar || FALLBACK_AVATAR} alt="" className="msg-avatar"
-                        onError={(e) => { e.currentTarget.src = FALLBACK_AVATAR; }} />
-                      <span className="msg-sender">{msg.senderName}</span>
-                    </div>
+                  <div key={msg.id} className={`message sticker-message ${msg.senderId === user?.userId ? 'own' : 'other'}`}>
+                    <img src={msg.stickerUrl} alt="sticker" className="sticker-image"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                    <span className="sticker-sender">
+                      {msg.senderId === user?.userId ? 'Вы' : msg.senderName}
+                    </span>
+                  </div>
+                );
+              }
+
+              if (isSystem) {
+                return (
+                  <div key={msg.id} className="message system">
                     <div className="msg-content">
                       {msg.content && <p>{msg.content}</p>}
-                      {msg.imageUrl && (
-                        <img src={msg.imageUrl} alt="attachment" className="msg-image"
-                          onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                      )}
-                      <span className="msg-time">{new Date(msg.sentAt).toLocaleTimeString()}</span>
                     </div>
                   </div>
                 );
-              })}
-              <div ref={messagesEndRef} />
-            </div>
+              }
 
-            <div className="message-input-wrapper" style={{ position: 'relative' }}>
-              {showStickerPanel && (
-                <div className="sticker-panel" ref={stickerPanelRef}>
-                  <div className="sticker-panel-header">
-                    <h4>Стикеры</h4>
-                    <button type="button" onClick={() => setShowStickerPanel(false)}>✕</button>
+              return (
+                <div key={msg.id} className={`message ${msg.senderId === user?.userId ? 'own' : 'other'}`}>
+                  <div className="msg-meta">
+                    <img src={msg.senderAvatar || FALLBACK_AVATAR} alt="" className="msg-avatar"
+                      onError={(e) => { e.currentTarget.src = FALLBACK_AVATAR; }} />
+                    <span className="msg-sender">{msg.senderName}</span>
                   </div>
-
-                  <div className="sticker-packs-tabs">
-                    {stickerPacks.map(pack => (
-                      <div key={pack.id}
-                        className={`sticker-pack-tab ${activePackId === pack.id ? 'active' : ''}`}
-                        onClick={() => setActivePackId(pack.id)}
-                        title={pack.name}>
-                        <img src={pack.coverUrl} alt={pack.name}
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="sticker-grid">
-                    {activePack && activePack.stickers.length > 0 ? (
-                      activePack.stickers.map(sticker => (
-                        <div key={sticker.id} className="sticker-item"
-                          onClick={() => sendSticker(sticker.imageUrl)}
-                          title={sticker.emoji || 'Стикер'}>
-                          <img src={sticker.imageUrl} alt={sticker.emoji || 'sticker'}
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                        </div>
-                      ))
-                    ) : (
-                      <div className="sticker-empty">Нет стикеров в этом наборе</div>
-                    )}
+                  <div className="msg-content">
+                    {msg.content && <p>{msg.content}</p>}
+                    <span className="msg-time">{new Date(msg.sentAt).toLocaleTimeString()}</span>
                   </div>
                 </div>
-              )}
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
 
-              <form className="message-input-area" onSubmit={sendMessage}>
-                <button type="button" className="sticker-toggle-btn"
-                  onClick={() => setShowStickerPanel(!showStickerPanel)}
-                  title="Стикеры">
-                  😀
-                </button>
+          <div className="message-input-wrapper" style={{ position: 'relative' }}>
+            {showStickerPanel && (
+              <div className="sticker-panel" ref={stickerPanelRef}>
+                <div className="sticker-panel-header">
+                  <h4>Стикеры</h4>
+                  <button type="button" onClick={() => setShowStickerPanel(false)}>✕</button>
+                </div>
 
-                <input type="text" value={newMessage}
-                  onChange={e => setNewMessage(e.target.value)}
-                  placeholder="Напишите сообщение..." />
-                <input type="file" accept="image/*"
-                  onChange={e => setImageFile(e.target.files?.[0] || null)} />
-                <button type="submit">Отправить</button>
-              </form>
-            </div>
-          </>
-        ) : (
-          <div className="welcome-screen">Выберите чат, чтобы начать обмен сообщениями</div>
-        )}
-      </main>
+                <div className="sticker-packs-tabs">
+                  {stickerPacks.map(pack => (
+                    <div key={pack.id}
+                      className={`sticker-pack-tab ${activePackId === pack.id ? 'active' : ''}`}
+                      onClick={() => setActivePackId(pack.id)}
+                      title={pack.name}>
+                      <img src={pack.coverUrl} alt={pack.name}
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    </div>
+                  ))}
+                </div>
 
-      {/* МОДАЛКИ (Вернул оригинальные) */}
+                <div className="sticker-grid">
+                  {activePack && activePack.stickers.length > 0 ? (
+                    activePack.stickers.map(sticker => (
+                      <div key={sticker.id} className="sticker-item"
+                        onClick={() => sendSticker(sticker.imageUrl)}
+                        title={sticker.emoji || 'Стикер'}>
+                        <img src={sticker.imageUrl} alt={sticker.emoji || 'sticker'}
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                      </div>
+                    ))
+                  ) : (
+                    <div className="sticker-empty">Нет стикеров в этом наборе</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+    <form className="message-input-area" onSubmit={sendMessage}>
+  <button type="button" className="sticker-toggle-btn" onClick={() => setShowStickerPanel(!showStickerPanel)}>😀</button>
+  <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="Напишите сообщение..." />
+  <button type="submit">Отправить</button>
+</form>
+          </div>
+        </>
+      ) : (
+        <div className="welcome-screen">Присоединитесь к чату(ам), чтобы начать обмен сообщениями</div>
+      )}
+    </main>
+
       {showCreateModal && (
         <div className="modal-overlay">
           <div className="modal">
             <h3>Создание нового чата</h3>
             <form onSubmit={handleCreateChat}>
               <input placeholder="Название чата" maxLength={100} required onChange={e => setFormData({ ...formData, chatName: e.target.value })} />
-              <textarea placeholder="Описание:" onChange={e => setFormData({ ...formData, description: e.target.value })} />
-              <label className="file-upload-label">
-                <span>Аватарка</span>
-                <input type="file" accept="image/*" onChange={e => setChatAvatarFile(e.target.files?.[0] || null)} />
-              </label>
-              <input placeholder="10-значный пароль" maxLength={10} minLength={10} required onChange={e => setFormData({ ...formData, accessCode: e.target.value })} />
+              <h3>Описание:</h3>
+              <input placeholder="Описание:" onChange={e => setFormData({ ...formData, description: e.target.value })} />
+              <h3>Пароль:</h3>
+              <input placeholder="Введите 10-значный пароль" maxLength={10} minLength={10} required onChange={e => setFormData({ ...formData, accessCode: e.target.value })} />
               <div className="modal-actions">
                 <button type="button" onClick={() => setShowCreateModal(false)}>Отмена</button>
                 <button type="submit">Создать</button>
@@ -676,7 +664,7 @@ const [connection, setConnection] = useState<HubConnection | null>(null);
           <div className="modal">
             <h3>Присоединиться к чату</h3>
             <form onSubmit={handleJoinChat}>
-              <input placeholder="10-значный пароль" maxLength={10} minLength={10} required onChange={e => setFormData({ ...formData, accessCode: e.target.value })} />
+              <input placeholder="Введите 10-значный пароль" maxLength={10} minLength={10} required onChange={e => setFormData({ ...formData, accessCode: e.target.value })} />
               <div className="modal-actions">
                 <button type="button" onClick={() => setShowJoinModal(false)}>Отмена</button>
                 <button type="submit">Присоединиться</button>
@@ -699,7 +687,6 @@ const [connection, setConnection] = useState<HubConnection | null>(null);
               <input value={formData.avatarUrl} onChange={e => setFormData({ ...formData, avatarUrl: e.target.value })} />
               <div className="modal-actions">
                 <button type="button" onClick={() => setShowProfileModal(false)}>Отмена</button>
-                <button type="submit">Изменить</button>
               </div>
             </form>
           </div>
@@ -711,23 +698,23 @@ const [connection, setConnection] = useState<HubConnection | null>(null);
           <div className="modal chat-info-modal">
             <h3>О чате</h3>
             <div className="chat-info-header">
-              <h4>Аватарка:</h4>
               <img src={activeChat.avatarUrl || FALLBACK_CHAT_AVATAR} alt={activeChat.name} className="chat-info-avatar"
                 onError={(e) => { e.currentTarget.src = FALLBACK_CHAT_AVATAR; }} />
-              <h4>Название чата:</h4>
+              <h3>Название чата:</h3>
               <h2>{activeChat.name}</h2>
-              <p className="chat-description">{activeChat.description || 'Нет описания'}</p>
+              <h3>Описание:</h3>
+              <p className="chat-description">{activeChat.description || 'Нет описания'}</p>              
             </div>
             <div className="chat-members-section">
-              <h4>Участники ({chatMembers.length})</h4>
+              <h4>Участники ({chatMembers.length}):</h4>
               <div className="members-list">
                 {chatMembers.map(member => (
                   <div key={member.userId} className="member-item">
-                    <img src={member.avatarUrl || FALLBACK_MEMBER_AVATAR} alt="" className="member-avatar"
-                      onError={(e) => { e.currentTarget.src = FALLBACK_MEMBER_AVATAR; }} />
+                    <img src={member.avatarUrl || FALLBACK_AVATAR} alt="" className="member-avatar"
+                      onError={(e) => { e.currentTarget.src = FALLBACK_AVATAR; }} />
                     <span className="member-name">{member.username}</span>
                     <span className={`status-indicator ${member.isOnline ? 'online' : 'offline'}`}>
-                      {member.isOnline ? '    🟢 Онлайн' : '    ⚫ Оффлайн'}
+                      {member.isOnline ? '   🟢 Онлайн' : '   🔴 Оффлайн'}
                     </span>
                   </div>
                 ))}

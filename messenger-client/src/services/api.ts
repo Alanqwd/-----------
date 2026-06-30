@@ -1,4 +1,3 @@
-console.log('🔵🔵🔵 ЗАГРУЖЕН  API.TS 🔵🔵🔵');
 import axios from 'axios';
 import type { StickerPack } from '../types';
 
@@ -57,9 +56,7 @@ export const stickerApi = {
     axios.post('http://localhost:5000/api/stickers/packs', data),  
   addSticker: (data: { packId: number; imageUrl: string; emoji?: string }) => 
     axios.post('http://localhost:5000/api/stickers/stickers', data),  
-  uploadSticker: (file: File) => fileApi.upload(file) 
 };
-
 export const fileApi = {
   upload: async (file: File) => {
     const formData = new FormData();
